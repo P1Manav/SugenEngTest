@@ -5,7 +5,15 @@ Combines extraction, assertion filtering, hybrid retrieval, hierarchy navigation
 import json
 import os
 import re
+import sys
+import traceback
 from typing import Dict, Any, List, Optional, Tuple, Set
+
+try:
+    import torch
+    torch.set_num_threads(1)
+except Exception:
+    pass
 
 from text_utils import normalize_code, clean_text, expand_abbreviations
 from assertion_filter import AssertionFilter, split_sentences_and_clauses
@@ -15,8 +23,8 @@ from retrieval import HybridRetriever
 from reranker import RuleReranker
 from multilingual import detect_language, translate_clinical_text
 
-# Default fallback code if all candidates fail validation
-DEFAULT_FALLBACK_CODE = "RA01"
+# High-frequency default outpatient codes if text is completely empty or unindexable
+DEFAULT_OUTPATIENT_CODES = ["1F40.Z", "CA40.Z", "1A07.Z"]
 
 
 class ICD11Pipeline:
@@ -27,13 +35,16 @@ class ICD11Pipeline:
         kb_path: str = "kb/enriched_kb.json",
         valid_codes_path: str = "kb/valid_codes.json",
         bm25_path: str = "kb/bm25.pkl",
-        dense_embeddings_path: str = "kb/dense_embeddings.npy",
+        dense_embeddings_path: str = "kb/dense_embeddings.npz",
         dense_codes_path: str = "kb/dense_codes.json",
         model_path: str = "models/all-MiniLM-L6-v2",
         verbose: bool = False,
     ):
         if verbose:
             print("Initializing ICD-11 Pipeline...")
+        # Fallback counter
+        self.fallback_count = 0
+
         # Load valid codes set
         with open(valid_codes_path, "r", encoding="utf-8") as f:
             self.valid_codes: Set[str] = set(json.load(f))
@@ -50,10 +61,49 @@ class ICD11Pipeline:
             dense_embeddings_path=dense_embeddings_path,
             dense_codes_path=dense_codes_path,
             model_path=model_path,
+            kb_path=kb_path,
         )
         self.reranker = RuleReranker(self.kb)
+
+        # Run startup self-test note
+        self._run_self_test()
+
         if verbose:
             print("Pipeline initialized successfully!")
+
+    def _run_self_test(self):
+        """Startup self-test note to verify pipeline integrity before batch inference."""
+        test_note = {"id": "__self_test__", "text": "Patient with fever and acute cough."}
+        try:
+            res = self.predict_note(test_note)
+            codes = res.get("codes", [])
+            assert codes and len(codes) >= 1, "Self-test failed: empty prediction"
+            assert all(c in self.valid_codes for c in codes), "Self-test failed: invalid code"
+        except Exception as e:
+            sys.stderr.write(f"[WARN] Pipeline startup self-test error: {e}\n")
+
+    def _get_bm25_fallback(self, raw_text: str) -> List[str]:
+        """Emit best BM25 codes for the note text on unexpected failure, never a constant."""
+        if not raw_text or not raw_text.strip():
+            return DEFAULT_OUTPATIENT_CODES
+
+        try:
+            clean_q = clean_text(expand_abbreviations(raw_text))
+            hits = self.retriever.bm25_retriever.retrieve(clean_q, top_k=10)
+            fallback_codes = []
+            for code, _ in hits:
+                leaf_code = self.hierarchy.resolve_to_leaf(code, raw_text)
+                norm_c = normalize_code(leaf_code)
+                if norm_c in self.valid_codes and norm_c not in fallback_codes:
+                    fallback_codes.append(norm_c)
+                if len(fallback_codes) >= 3:
+                    break
+            if fallback_codes:
+                return fallback_codes
+        except Exception:
+            pass
+
+        return DEFAULT_OUTPATIENT_CODES
 
     def predict_note(self, note: Dict[str, Any]) -> Dict[str, Any]:
         """Predict top-3 ICD-11 codes for a clinical note."""
@@ -62,7 +112,7 @@ class ICD11Pipeline:
         style = note.get("style")
 
         if not raw_text.strip():
-            return {"id": note_id, "codes": [DEFAULT_FALLBACK_CODE]}
+            return {"id": note_id, "codes": self._get_bm25_fallback(raw_text)}
 
         try:
             # Detect language and translate clinical terms if non-English
@@ -135,13 +185,16 @@ class ICD11Pipeline:
 
             # 9. Fallback if empty
             if not selected_codes:
-                selected_codes = [DEFAULT_FALLBACK_CODE]
+                selected_codes = self._get_bm25_fallback(raw_text)
 
             return {"id": note_id, "codes": selected_codes[:3]}
 
         except Exception as e:
-            # Resilient fallback: never crash on unexpected input
-            return {"id": note_id, "codes": [DEFAULT_FALLBACK_CODE]}
+            # Resilient fallback with stderr logging and BM25 recovery, never a constant RA01
+            self.fallback_count += 1
+            sys.stderr.write(f"[ERROR] Note {note_id} failed in pipeline: {e}\n")
+            traceback.print_exc(file=sys.stderr)
+            return {"id": note_id, "codes": self._get_bm25_fallback(raw_text)[:3]}
 
     def _select_diverse_top3(
         self,

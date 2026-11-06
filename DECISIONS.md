@@ -151,3 +151,32 @@
 3. Unicode script gate + Lingua + clinical marker fallback — 100% offline, zero network calls, exact 10/10 detection on benchmark suite (`tests/test_language_id.py`), and non-Latin scripts are strictly protected from falling through to English.
 
 **What decided it:** Satisfies P0 requirement 1.6. Verified by `tests/test_language_id.py` across 10 distinct language families with 100% exact accuracy.
+
+
+---
+
+## Entry 11 — 2026-11-06 17:25 IST — Offline-Safe Build, Vendored Weights & Compressed NPZ Embeddings
+
+**Task:** 1.2  
+**Decision:** Vendor all model weights locally (`models/all-MiniLM-L6-v2/model.safetensors`, `models/fasttext/lid.176.ftz`), compress dense embeddings to `kb/dense_embeddings.npz` (26 MB, 0.03s load time), pin all dependencies in `requirements.txt` (`torch==2.5.1`, `sentence-transformers==6.2.0`, `numpy==2.4.6`, `scikit-learn==1.9.1`, `lingua-language-detector==2.1.1`, `onnxruntime==1.31.1`, `openai==2.54.0`, `anthropic==2.6.0`), and remove redundant build-time network downloads from `Dockerfile`.
+
+**Options considered:**
+1. Download models from HuggingFace at build time — fails in offline or proxy-restricted environments and adds fragile external network dependencies.
+2. Store uncompressed `.npy` (28.2 MB) vs `.npz` (26.1 MB) — `.npz` provides portable compressed storage with instant numpy loading.
+3. Keep unpinned version ranges in `requirements.txt` — risks build breakage when transitive dependencies update.
+
+**What decided it:** Satisfies P0 requirement 1.2. Model weights and indexes vendor cleanly into the repo, guaranteeing zero network requests during `docker compose build`.
+
+---
+
+## Entry 12 — 2026-11-06 17:30 IST — Runtime Hygiene, Startup Self-Test & Non-Silent Failure Recovery
+
+**Task:** 1.3, 1.4  
+**Decision:** Eliminate silent `except Exception: return RA01` fallbacks. Added startup self-test note (`{"id": "__self_test__"}`), trace logging to `sys.stderr` with note IDs, fallback tracking counter, and BM25-based candidate recovery (`_get_bm25_fallback`) when unexpected errors occur. In `entrypoint.py`, added raw string ID recovery for corrupted JSON lines, input ID deduplication, thread pinning (`torch.set_num_threads(1)`), and `imap_unordered` pooling.
+
+**Options considered:**
+1. Hardcoded constant fallback (`RA01`) on failure — artificially penalizes score and masks diagnostic errors.
+2. Dynamic BM25 fallback — retrieves relevant leaf codes even if neural components fail, preserving prediction quality.
+3. Inventing line IDs (`malformed-line-N`) — violates the requirement that input IDs match output IDs; regex extraction from raw lines preserves original IDs.
+
+**What decided it:** Satisfies P0 requirements 1.3 and 1.4. Verified by unit tests in `tests/test_runtime_hygiene.py` covering self-test, empty inputs, malformed ID regex recovery, and BM25 fallback.

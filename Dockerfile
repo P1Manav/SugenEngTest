@@ -4,21 +4,24 @@ WORKDIR /app
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PIP_NO_CACHE_DIR=1
+    PIP_NO_CACHE_DIR=1 \
+    OMP_NUM_THREADS=1 \
+    MKL_NUM_THREADS=1 \
+    OPENBLAS_NUM_THREADS=1
 
 # Install minimal build tools
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Install PyTorch CPU first to keep image lightweight and avoid multi-GB CUDA overhead
-RUN pip install torch --index-url https://download.pytorch.org/whl/cpu
+# Install PyTorch CPU pinned to keep image lightweight and avoid multi-GB CUDA overhead
+RUN pip install torch==2.5.1 --index-url https://download.pytorch.org/whl/cpu
 
-# Copy and install python dependencies
+# Copy and install pinned python dependencies
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 
-# Copy application source code
+# Copy application source code and tests
 COPY scripts/ scripts/
 COPY text_utils.py .
 COPY assertion_filter.py .
@@ -32,18 +35,14 @@ COPY build_kb.py .
 COPY build_index.py .
 COPY entrypoint.py .
 COPY evaluate.py .
+COPY score.py .
 COPY tests/ tests/
 
-# Copy MMS source data
-COPY data/mms-2026-01.json data/mms-2026-01.json
+# Copy MMS source data and dev data
+COPY data/ data/
 
-# Copy prebuilt artifacts or build them at build time
+# Copy prebuilt artifacts and vendored model weights (no external downloads at build or run time)
 COPY models/ models/
 COPY kb/ kb/
-
-# Ensure models are cached and indexes are built at build time
-RUN python scripts/download_models.py
-RUN python build_kb.py data/mms-2026-01.json
-RUN python build_index.py kb/enriched_kb.json models/all-MiniLM-L6-v2
 
 ENTRYPOINT ["python", "entrypoint.py"]
