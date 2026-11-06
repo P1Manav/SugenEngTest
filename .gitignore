@@ -39,6 +39,7 @@ models/cache/
 out/
 predictions*.jsonl
 !data/predictions.example.jsonl
+*.bundle
 
 # Temp
 *.tmp
