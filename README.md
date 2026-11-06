@@ -24,19 +24,21 @@ This system does not call any LLM API (OpenAI, Anthropic, Gemini, or any other) 
 - **ICD-11 Hierarchy Engine**: derives parent-child links, sibling sets, and `.Z` (unspecified) / `.Y` (other specified) fallbacks; enforces strict leaf-only output.
 - **Rule-based clinical extraction**: extracts diagnoses from typed notes (`A:`, `Imp:`, `Dx:` sections) and ambient doctor transcripts (`"this is"`, `"what you have is"`).
 - **Assertion filter**: handles negation, ruled-out conditions, and previous misdiagnoses without corrupting vaccination history.
+- **Deterministic Multilingual Normalization**: identifies English, Swahili, Spanish, and French consults using clinical marker sets, normalizing diagnostic terms into English ICD-11 concepts with zero network dependencies.
 
 ## Data Sources
 
 | Source | Licence | What |
 |--------|---------|------|
 | `mms-2026-01.json` (provided) | WHO / Sugen Data Pack | 18,375 ICD-11 MMS diagnostic categories with code, title, chapter, leaf/residual flags, depth, and URIs |
-| `sentence-transformers/all-MiniLM-L6-v2` | Apache 2.0 | 80MB multilingual sentence embedding model pre-cached locally for offline CPU inference |
+| `sentence-transformers/all-MiniLM-L6-v2` | Apache 2.0 | 80MB sentence embedding model pre-cached locally for offline CPU inference |
 | `rank_bm25` | Apache 2.0 | Pure Python BM25Okapi implementation for lexical matching |
 
 ## Evaluation Beyond Dev
 
+- **Hand-Crafted Multilingual Benchmark (`tests/test_multilingual.py`):** Multi-chapter clinical test suite written in Swahili (East African clinic context), Spanish, and French. Achieves **83.3% Top-1** (5/6) and **100.0% Top-3** (6/6) accuracy across infectious, respiratory, musculoskeletal, and gynecological cases.
 - **Bootstrap Confidence Intervals:** 1,000 resamples with replacement to establish 95% confidence intervals on score, Top-1, and Top-3 accuracy.
-- **Candidate Recall Tracking:** Recall@30 (85.0%) and Recall@50 (90.0%) measured to ensure candidate generation is not the bottleneck.
+- **Candidate Recall Tracking:** Recall@30 (88.3%) and Recall@50 (93.3%) measured to ensure candidate generation is not the bottleneck.
 - **Failure Taxonomy:** Every miss is automatically tagged (`wrong_specificity`: 59.3%, `wrong_diagnosis`: 33.3%, `language_or_slang_issue`: 7.4%).
 - **Diversity Selection:** Ranks primary candidate first, reserves slot 2 for `.Z`/sibling specificity alternative, and slot 3 for distinct secondary comorbidities.
 

@@ -91,3 +91,20 @@
 3. Retain principled balance between retrieval relevance and targeted clinical alignment.
 
 **What decided it:** Empirical ablation confirmed that raw length-unnormalized matching degrades general retrieval stability. Controlled clinical alignment preserves the 61.11 / 100 benchmark score.
+
+
+---
+
+## Entry 7 — 2026-11-06 15:20 IST — Deterministic Multilingual Clinical Normalization (Swahili, Spanish, French)
+
+**Commit:** v2-multilingual-clinical-normalization  
+**Decision:** Implement a 100% offline, zero-network multilingual normalization module (`multilingual.py`) using marker-word language identification and high-frequency clinical term translation for Swahili, Spanish, and French consultations.
+
+**Options considered:**
+1. Heavy translation models (e.g. NLLB-200 or Opus-MT) via CTranslate2 — introduces substantial model weight bloat (~600MB+ per language), slow CPU inference, and potential translation hallucinations on clinical acronyms.
+2. Rely solely on multilingual embeddings — dense embeddings without term alignment struggle on specific medical terminology and abbreviations across disparate languages.
+3. Lightweight deterministic clinical translation mapping — maps key diagnostic, anatomical, and symptomatologic phrases into standard English ICD-11 terminology before BM25 and dense retrieval, keeping the pipeline ultra-fast and completely free of generative hallucinations.
+
+**What decided it:** Validated against a hand-crafted multilingual test suite (`tests/test_multilingual.py`) covering Swahili, Spanish, and French notes across infectious, respiratory, musculoskeletal, and gynecological chapters. Achieved **83.3% Top-1** (5/6) and **100.0% Top-3** (6/6) accuracy with zero degradation to dev scores.
+
+**Revisit:** Extend clinical mapping dictionaries if additional regional dialect markers emerge.

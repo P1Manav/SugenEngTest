@@ -13,6 +13,7 @@ from diagnosis_extractor import DiagnosisExtractor
 from icd_hierarchy import ICDHierarchy
 from retrieval import HybridRetriever
 from reranker import RuleReranker
+from multilingual import detect_language, translate_clinical_text
 
 # Default fallback code if all candidates fail validation
 DEFAULT_FALLBACK_CODE = "RA01"
@@ -64,8 +65,12 @@ class ICD11Pipeline:
             return {"id": note_id, "codes": [DEFAULT_FALLBACK_CODE]}
 
         try:
+            # Detect language and translate clinical terms if non-English
+            lang = detect_language(raw_text)
+            input_text = translate_clinical_text(raw_text, lang) if lang != "en" else raw_text
+
             # 1. Expand abbreviations & extract diagnostic phrases
-            extracted = self.extractor.extract_diagnoses(raw_text, style=style)
+            extracted = self.extractor.extract_diagnoses(input_text, style=style)
             primary_query = extracted["primary_query"]
             extracted_phrases = extracted["phrases"]
             expanded_text = extracted["expanded_text"]
