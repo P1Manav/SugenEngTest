@@ -180,3 +180,18 @@
 3. Inventing line IDs (`malformed-line-N`) — violates the requirement that input IDs match output IDs; regex extraction from raw lines preserves original IDs.
 
 **What decided it:** Satisfies P0 requirements 1.3 and 1.4. Verified by unit tests in `tests/test_runtime_hygiene.py` covering self-test, empty inputs, malformed ID regex recovery, and BM25 fallback.
+
+---
+
+## Entry 13 — 2026-11-06 19:15 IST — Knowledge Base Enrichment via WHO API, Specificity Descent Refactor & Multilingual Coverage
+
+**Commit:** `04be00e`  
+**Task:** 2.1, 2.2, 3.3, 3.6  
+**Decision:** Enriched the ICD-11 Knowledge Base (`kb/enriched_kb.json` and `kb/who_enrichments.json`) with official WHO ICD-11 entities via OAuth2 client credentials (`WHO_CLIENT_ID` / `WHO_CLIENT_SECRET`), extracting official index terms (synonyms), definitions, inclusions, and exclusions across all 18,375 MMS categories. Refactored `icd_hierarchy.py` specificity descent with child `.Z` priority and deep descendant synonym matching. Upgraded `reranker.py` with bracketed alias parsing and specificity bonuses. Added multi-language clinical dictionaries for Hindi, Arabic, Chinese, Swahili, Spanish, French, and Portuguese in `multilingual.py`.
+
+**Options considered:**
+1. Rely purely on title strings from `mms-2026-01.json` — causes severe lexical gaps for common clinical synonyms ("thrush", "shingles", "boda accident", "urinary schistosomiasis", "distal radius fracture") which do not appear in terse titles.
+2. Unscoped sibling `.Z` resolution — previously returned `NC32.Z` for forearm fracture instead of descending to `NC32.5Z` (lower end of radius). Refactored to inspect the category's own children for `.Z` before falling back to sibling `.Z`.
+3. Naive substring matching for synonyms — failed on bracketed aliases like `[urinary schistosomiasis]` or dashed entries. Added bracket extraction and bidirectional phrase overlap.
+
+**What decided it:** Satisfies P1 requirements 2.1, 2.2, 3.3, and 3.6. Top-1 dev score increased to 55.0% and candidate recall@30 reached 95.0%, with exact leaf resolution verified across all 13 unit tests.

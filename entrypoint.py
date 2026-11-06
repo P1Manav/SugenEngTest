@@ -9,8 +9,8 @@ import os
 import re
 import sys
 import time
-from typing import Dict, Any, Optional
 from multiprocessing import Pool, cpu_count
+from typing import Any
 
 # Pin single thread per process across all BLAS/Torch libraries
 os.environ["OMP_NUM_THREADS"] = "1"
@@ -45,7 +45,7 @@ def init_worker():
         _worker_pipeline = None
 
 
-def process_single_note(note_data: Dict[str, Any]) -> Dict[str, Any]:
+def process_single_note(note_data: dict[str, Any]) -> dict[str, Any]:
     """Process a single note and return prediction dict."""
     global _worker_pipeline
     note_id = note_data.get("id", "unknown")
@@ -127,7 +127,7 @@ def main():
                 seen_input_ids.add(note_id)
                 if note_id not in processed_ids:
                     pending_notes.append(item)
-            except Exception as e:
+            except Exception:
                 # Malformed JSON line: extract id from raw string, never invent arbitrary names if id exists
                 orig_id = extract_id_from_raw_line(line, line_idx)
                 if orig_id not in processed_ids and orig_id not in seen_input_ids:

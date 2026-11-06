@@ -1,6 +1,5 @@
 """Unit tests for runtime hygiene, self-test, fallback mechanism, and error logging."""
 
-import io
 import json
 import os
 import sys
@@ -9,8 +8,9 @@ import unittest
 
 sys.path.insert(0, ".")
 
-from pipeline import ICD11Pipeline
 from entrypoint import extract_id_from_raw_line
+from pipeline import ICD11Pipeline
+
 
 class TestRuntimeHygiene(unittest.TestCase):
     @classmethod
@@ -80,3 +80,4 @@ class TestRuntimeHygiene(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

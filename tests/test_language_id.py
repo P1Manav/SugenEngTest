@@ -1,8 +1,10 @@
 """Unit tests for offline language identification and non-Latin script gating."""
 
 import sys
+
 sys.path.insert(0, ".")
 from multilingual import detect_language
+
 
 def test_language_identification():
     cases = [
@@ -41,3 +43,4 @@ def test_language_identification():
 
 if __name__ == "__main__":
     test_language_identification()
+

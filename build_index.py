@@ -10,11 +10,12 @@ import json
 import os
 import pickle
 import sys
+
 import numpy as np
 from rank_bm25 import BM25Okapi
 from sentence_transformers import SentenceTransformer
 
-from text_utils import tokenize, clean_text, expand_abbreviations
+from text_utils import clean_text, expand_abbreviations, tokenize
 
 
 def build_indexes(

@@ -6,16 +6,15 @@ import argparse
 import json
 import os
 import random
-import sys
-import time
-from typing import Dict, Any, List, Set, Tuple, Optional
+from typing import Any
+
 import numpy as np
 
-from text_utils import normalize_code
 from pipeline import ICD11Pipeline
+from text_utils import normalize_code
 
 
-def load_jsonl(path: str) -> List[Dict[str, Any]]:
+def load_jsonl(path: str) -> list[dict[str, Any]]:
     rows = []
     with open(path, "r", encoding="utf-8") as f:
         for line in f:
@@ -25,7 +24,7 @@ def load_jsonl(path: str) -> List[Dict[str, Any]]:
     return rows
 
 
-def compute_score(results: List[Dict[str, Any]]) -> Dict[str, float]:
+def compute_score(results: list[dict[str, Any]]) -> dict[str, float]:
     """Compute score following score.py rules."""
     stats = {}
     for r in results:
@@ -61,7 +60,7 @@ def compute_score(results: List[Dict[str, Any]]) -> Dict[str, float]:
     }
 
 
-def bootstrap_ci(results: List[Dict[str, Any]], n_resamples: int = 1000, alpha: float = 0.05) -> Dict[str, Tuple[float, float]]:
+def bootstrap_ci(results: list[dict[str, Any]], n_resamples: int = 1000, alpha: float = 0.05) -> dict[str, tuple[float, float]]:
     """Compute bootstrap percentile confidence intervals for score, top1, and top3."""
     n = len(results)
     if n == 0:
@@ -91,7 +90,7 @@ def bootstrap_ci(results: List[Dict[str, Any]], n_resamples: int = 1000, alpha: 
 
 def evaluate(
     gold_path: str = "data/dev_notes.jsonl",
-    pred_path: Optional[str] = None,
+    pred_path: str | None = None,
     output_pred_path: str = "out/dev_predictions.jsonl",
     mms_path: str = "kb/valid_codes.json",
 ):
@@ -161,7 +160,6 @@ def evaluate(
                     fallback_query=extracted["expanded_text"],
                     top_k=50,
                 )
-                cand_codes = [c[0] for c in cands]
                 # Check with hierarchy expansion
                 expanded_cands = [c[0] for c in pipeline.hierarchy.expand_candidates(cands, max_expansions=50)]
                 resolved_50 = [pipeline.hierarchy.resolve_to_leaf(c) for c in expanded_cands[:50]]

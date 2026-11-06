@@ -3,9 +3,10 @@ Validates bootstrap CI against a known synthetic binomial proportion.
 """
 
 import sys
+
 sys.path.insert(0, ".")
-import numpy as np
 from evaluate import bootstrap_ci
+
 
 def test_bootstrap_known_proportion():
     # 60 trials with 33 successes (exact 55% Top-1 rate as on dev)
@@ -28,3 +29,4 @@ def test_bootstrap_known_proportion():
 
 if __name__ == "__main__":
     test_bootstrap_known_proportion()
+

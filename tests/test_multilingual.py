@@ -3,9 +3,10 @@ Evaluates pipeline on hand-crafted multi-chapter clinical notes in Swahili, Span
 """
 
 import sys
+
 sys.path.insert(0, ".")
-import json
 from pipeline import ICD11Pipeline
+
 
 def test_multilingual_generalisation():
     p = ICD11Pipeline()

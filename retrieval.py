@@ -7,10 +7,10 @@ import json
 import os
 import pickle
 import sys
-from typing import List, Dict, Tuple, Optional
+
 import numpy as np
 
-from text_utils import tokenize, clean_text, expand_abbreviations
+from text_utils import clean_text, expand_abbreviations, tokenize
 
 
 class BM25Retriever:
@@ -39,7 +39,7 @@ class BM25Retriever:
             from rank_bm25 import BM25Okapi
             self.bm25 = BM25Okapi(tokenized_corpus)
 
-    def retrieve(self, query: str, top_k: int = 50) -> List[Tuple[str, float]]:
+    def retrieve(self, query: str, top_k: int = 50) -> list[tuple[str, float]]:
         """Retrieve top-K matching ICD-11 codes for a query string."""
         if not query or not query.strip():
             return []
@@ -94,7 +94,7 @@ class DenseRetriever:
             model_name_or_path = "sentence-transformers/all-MiniLM-L6-v2"
         self.model = SentenceTransformer(model_name_or_path)
 
-    def retrieve(self, query: str, top_k: int = 50) -> List[Tuple[str, float]]:
+    def retrieve(self, query: str, top_k: int = 50) -> list[tuple[str, float]]:
         """Retrieve top-K semantic nearest neighbors for a query string."""
         if not query or not query.strip():
             return []
@@ -118,16 +118,16 @@ class DenseRetriever:
 
 
 def reciprocal_rank_fusion(
-    ranked_lists: List[List[Tuple[str, float]]],
-    weights: Optional[List[float]] = None,
+    ranked_lists: list[list[tuple[str, float]]],
+    weights: list[float] | None = None,
     k: int = 60,
     top_k: int = 50,
-) -> List[Tuple[str, float]]:
+) -> list[tuple[str, float]]:
     """Combine multiple ranked lists using Reciprocal Rank Fusion (RRF)."""
     if weights is None:
         weights = [1.0] * len(ranked_lists)
 
-    scores: Dict[str, float] = {}
+    scores: dict[str, float] = {}
 
     for ranked_list, weight in zip(ranked_lists, weights):
         for rank_idx, (code, _) in enumerate(ranked_list):
@@ -167,7 +167,7 @@ class HybridRetriever:
         primary_query: str,
         fallback_query: str = "",
         top_k: int = 50,
-    ) -> List[Tuple[str, float]]:
+    ) -> list[tuple[str, float]]:
         """Retrieve candidates by querying BM25 and dense with primary and fallback queries."""
         ranked_lists = []
         weights = []

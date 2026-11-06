@@ -1,19 +1,20 @@
-"""Build the enriched knowledge base from mms-2026-01.json.
+"""Build the enriched knowledge base from mms-2026-01.json and official WHO API enrichments.
 
 Creates:
-- kb/enriched_kb.json: Enriched dictionary of ICD-11 categories with hierarchy, search text, siblings, .Y/.Z codes
+- kb/enriched_kb.json: Enriched dictionary of ICD-11 categories with hierarchy, WHO synonyms,
+  inclusions, exclusions, definitions, search text, siblings, .Y/.Z codes
 - kb/valid_codes.json: List of all valid normalized MMS codes
 """
 
 import json
 import os
 import sys
-from typing import Dict, Any, Optional
+from typing import Any
 
-from text_utils import normalize_code, clean_text
+from text_utils import clean_text, normalize_code
 
 
-def derive_parent_code(code: str, depth: int) -> Optional[str]:
+def derive_parent_code(code: str, depth: int) -> str | None:
     """Derive parent code from code structure."""
     if depth == 1 or "." not in code:
         return None
@@ -37,13 +38,27 @@ def build_kb(mms_path: str, kb_dir: str):
 
     print(f"Loaded {len(categories)} categories.")
 
+    # Load WHO enrichments if available
+    who_enrichments = {}
+    who_path = os.path.join(kb_dir, "who_enrichments.json")
+    if os.path.exists(who_path):
+        try:
+            with open(who_path, "r", encoding="utf-8") as f:
+                who_enrichments = json.load(f)
+            print(f"Loaded {len(who_enrichments)} WHO enrichments from {who_path}.")
+        except Exception as e:
+            print(f"Warning loading WHO enrichments: {e}")
+
     # 1. Map by normalized code
-    code_map: Dict[str, Dict[str, Any]] = {}
+    code_map: dict[str, dict[str, Any]] = {}
     valid_codes = []
 
     for cat in categories:
         code = normalize_code(cat["code"])
         valid_codes.append(code)
+
+        who_info = who_enrichments.get(code, {})
+
         code_map[code] = {
             "code": code,
             "title": cat.get("title", ""),
@@ -57,11 +72,15 @@ def build_kb(mms_path: str, kb_dir: str):
             "siblings": [],
             "z_code": None,
             "y_code": None,
+            "synonyms": who_info.get("synonyms", []),
+            "inclusions": who_info.get("inclusions", []),
+            "exclusions": who_info.get("exclusions", []),
+            "definition": who_info.get("definition", ""),
             "search_text": "",
         }
 
     # 2. Derive parent-child relationships
-    parent_to_children: Dict[str, list] = {}
+    parent_to_children: dict[str, list] = {}
     for code, info in code_map.items():
         parent = derive_parent_code(code, info["depth"])
         if parent and parent in code_map:
@@ -92,17 +111,29 @@ def build_kb(mms_path: str, kb_dir: str):
                 elif ch.endswith(".Y") or ch.endswith("Y"):
                     info["y_code"] = ch
 
-    # 4. Construct rich search text (including ancestor titles)
+    # 4. Construct rich search text (ancestors + title + synonyms + inclusions + definition)
     for code, info in code_map.items():
         titles = [info["title"]]
         curr = info["parent"]
         while curr and curr in code_map:
             titles.append(code_map[curr]["title"])
             curr = code_map[curr]["parent"]
-        # Ancestors first, then title
         titles.reverse()
-        search_text = " - ".join(titles)
-        info["search_text"] = clean_text(search_text)
+        base_title = " - ".join(titles)
+
+        search_parts = [base_title]
+        syns = info.get("synonyms", [])
+        if syns:
+            search_parts.append(" ".join(syns[:12]))
+        incs = info.get("inclusions", [])
+        if incs:
+            search_parts.append(" ".join(incs[:6]))
+        definition = info.get("definition", "")
+        if definition:
+            search_parts.append(definition)
+
+        full_search = " ".join(search_parts)
+        info["search_text"] = clean_text(full_search)
 
     # 5. Save enriched_kb.json and valid_codes.json
     enriched_path = os.path.join(kb_dir, "enriched_kb.json")

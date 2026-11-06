@@ -3,7 +3,7 @@ Handles Negation, History, Comorbidity, Ruled Out, Family History, and Previous 
 """
 
 import re
-from typing import List, Dict, Any, Tuple, Optional
+from typing import Dict, List, Optional, Tuple
 
 # Pre-negation triggers (negate following terms within scope)
 PRE_NEGATION_TRIGGERS = [

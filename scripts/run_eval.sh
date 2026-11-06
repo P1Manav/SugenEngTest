@@ -20,3 +20,4 @@ echo "SCORING WITH OFFICIAL GRADER"
 echo "============================================================"
 
 python score.py --gold "${DEV_NOTES}" --pred "${PRED_OUT}" --mms "${MMS_PATH}"
+

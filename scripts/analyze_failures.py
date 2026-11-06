@@ -1,10 +1,10 @@
 import json
 
 with open("data/dev_notes.jsonl", encoding="utf-8") as f:
-    golds = {json.loads(l)["id"]: json.loads(l) for l in f if l.strip()}
+    golds = {json.loads(line)["id"]: json.loads(line) for line in f if line.strip()}
 
 with open("out/dev_predictions.jsonl", encoding="utf-8") as f:
-    preds = {json.loads(l)["id"]: json.loads(l) for l in f if l.strip()}
+    preds = {json.loads(line)["id"]: json.loads(line) for line in f if line.strip()}
 
 print(f"{'ID':<10} {'STATUS':<8} {'GOLD':<15} {'PRED':<25} {'NOTE'}")
 print("-" * 80)
