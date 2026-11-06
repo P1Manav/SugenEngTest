@@ -136,3 +136,18 @@
 2. Fix index array reference and validate against exact normal approximation ($0.55 \pm 1.96 \sqrt{0.55 \times 0.45 / 60}$) — confirms symmetrical distribution `[43.3%, 68.3%]`.
 
 **What decided it:** Fixed bug and verified via unit test. Re-evaluated dev notes: Top-1 95% CI is now `[43.3%, 68.3%]`, Top-3 95% CI is `[61.7%, 85.0%]`, and Score 95% CI is `[37.92, 54.18]`.
+
+
+---
+
+## Entry 10 — 2026-11-06 17:15 IST — Real Offline Language ID with Unicode Script Gating
+
+**Task:** 1.6  
+**Decision:** Replace heuristic marker-word detection with real offline language identification combining instant Unicode script gating (Devanagari, Arabic, Japanese Kana, CJK, Cyrillic) and Lingua n-gram detection.
+
+**Options considered:**
+1. Marker words only — non-Latin scripts (Hindi, Arabic, Chinese, Russian, Japanese) contain no Latin words and fall through to English.
+2. FastText with standard Python binding — broke due to NumPy 2.x `copy=False` deprecation.
+3. Unicode script gate + Lingua + clinical marker fallback — 100% offline, zero network calls, exact 10/10 detection on benchmark suite (`tests/test_language_id.py`), and non-Latin scripts are strictly protected from falling through to English.
+
+**What decided it:** Satisfies P0 requirement 1.6. Verified by `tests/test_language_id.py` across 10 distinct language families with 100% exact accuracy.
