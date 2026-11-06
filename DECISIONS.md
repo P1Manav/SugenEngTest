@@ -210,3 +210,17 @@
 3. Crashing on API failure — violates the >90% prediction requirement. Any API error or timeout automatically degrades gracefully to baseline candidates.
 
 **What decided it:** Satisfies P2 requirement 4. Verified by unit tests in `tests/test_llm_reranker.py` covering candidate gating, spend guard shutoff, disabled baseline mode, and error fallback.
+
+---
+
+## Entry 15 — 2026-11-06 19:30 IST — Held-Out Evaluation Suite Across All 26 Chapters and 8 Languages
+
+**Commit:** `fce6d82`  
+**Task:** 5.1  
+**Decision:** Created a comprehensive 85-note held-out evaluation dataset (`data/held_out_notes.jsonl` and generator `scripts/create_held_out_notes.py`) designed to stress-test generalization beyond dev. The suite spans all 26 ICD-11 MMS chapters and 8 languages (English, Swahili, French, Spanish, Hindi, Arabic, Chinese, Portuguese). All gold targets are strictly certified valid leaf categories against `data/mms-2026-01.json`, incorporating clinical traps (negated differentials, comorbidities, previous misdiagnoses).
+
+**Options considered:**
+1. Randomly splitting the 60-note dev set — leaves chapters 02, 06, 07, 08, 09, 10, 17, 19, 20, 23, 25, 26 unrepresented and restricts testing to English/Swahili.
+2. Generating notes with synthetic non-existent codes — invalidates exact-match grading. All codes are verified against MMS category leaves.
+
+**What decided it:** Satisfies P3 requirement 5.1. Measured baseline offline performance: Top-1: 32.94%, Top-3: 56.47%, Score: 30.59 / 75.0 (40.78 / 100), with 0 missing predictions and 0 invalid codes.
