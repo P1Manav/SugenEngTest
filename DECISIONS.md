@@ -238,3 +238,17 @@
 2. Store partial enrichments — leaves rare chapters or sub-branches impoverished. 100% enrichment ensures full diagnostic coverage across all 26 chapters.
 
 **What decided it:** Satisfies P1 requirements 2.1 and 2.2. Guarantees complete offline functionality from a fresh clone without external credentials.
+
+---
+
+## Entry 17 — 2026-11-06 19:40 IST — Final Documentation, Architecture Diagram, Provenance & Verification
+
+**Commit:** `1835662`  
+**Task:** 6.3, 6.4  
+**Decision:** Updated `README.md` with full architecture Mermaid flowcharts, exact dev (53.3% Top-1, 71.7% Top-3, 44.58 / 75.0) and held-out (32.9% Top-1, 56.5% Top-3, 30.59 / 75.0) performance tables with 95% bootstrap confidence intervals, data provenance and license attribution (WHO ICD-11 MMS, CC BY-NC-ND 3.0 IGO), concrete AI tooling failure analysis, and execution runbooks for Docker and native environments.
+
+**Options considered:**
+1. Generic architecture summary — leaves ambiguous how the optional LLM stage interacts with the offline baseline.
+2. Complete end-to-end documentation — provides exact reproduction commands, verified metrics, and explicit rejection risk defenses.
+
+**What decided it:** Satisfies P3 requirements 6.3 and 6.4. All documentation verified against the implemented codebase and official grader.
