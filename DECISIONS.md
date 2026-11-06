@@ -224,3 +224,17 @@
 2. Generating notes with synthetic non-existent codes — invalidates exact-match grading. All codes are verified against MMS category leaves.
 
 **What decided it:** Satisfies P3 requirement 5.1. Measured baseline offline performance: Top-1: 32.94%, Top-3: 56.47%, Score: 30.59 / 75.0 (40.78 / 100), with 0 missing predictions and 0 invalid codes.
+
+---
+
+## Entry 16 — 2026-11-06 19:35 IST — 100% Complete WHO ICD-11 Release Enrichment Vendored
+
+**Commit:** `1ac8268`  
+**Task:** 2.1, 2.2  
+**Decision:** Fully completed asynchronous WHO API release enrichment for all 18,375 categories in `data/mms-2026-01.json`, yielding 93,387 official WHO index terms, definitions, inclusions, and exclusions. Rebuilt `kb/enriched_kb.json` (23.5 MB) and `kb/bm25.pkl` (5.68 MB), and vendored `kb/who_enrichments.json` (9.08 MB) directly into the repository. This provides 100% offline self-containment with zero runtime or build-time WHO API dependency.
+
+**Options considered:**
+1. Fetch WHO enrichments at Docker build time — would fail in offline test environments or when credentials are absent, risking build rejection.
+2. Store partial enrichments — leaves rare chapters or sub-branches impoverished. 100% enrichment ensures full diagnostic coverage across all 26 chapters.
+
+**What decided it:** Satisfies P1 requirements 2.1 and 2.2. Guarantees complete offline functionality from a fresh clone without external credentials.
