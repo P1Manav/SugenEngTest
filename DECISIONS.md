@@ -195,3 +195,18 @@
 3. Naive substring matching for synonyms — failed on bracketed aliases like `[urinary schistosomiasis]` or dashed entries. Added bracket extraction and bidirectional phrase overlap.
 
 **What decided it:** Satisfies P1 requirements 2.1, 2.2, 3.3, and 3.6. Top-1 dev score increased to 55.0% and candidate recall@30 reached 95.0%, with exact leaf resolution verified across all 13 unit tests.
+
+---
+
+## Entry 14 — 2026-11-06 19:25 IST — Optional LLM Reranking Stage with Hard Budget Guard and Candidate Gating
+
+**Commit:** `bfe1e65`  
+**Task:** 4.1, 4.2  
+**Decision:** Implemented optional LLM reranking stage (`llm_reranker.py`, integrated into `pipeline.py`) that activates strictly when `USE_LLM_RERANK=1` and `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` is present. Baseline pipeline remains 100% offline, zero-network, and zero-overhead when disabled. Candidate gating strictly limits model selection to top-20 baseline candidates, validated against `valid_codes.json`. Implemented cumulative token cost accounting with a hard $4.00 spend guard and a 15-second per-note timeout that falls back to baseline on any failure.
+
+**Options considered:**
+1. Free-form generation of ICD-11 codes by LLM — high risk of hallucinated or non-leaf codes that score 0. Candidate gating guarantees 100% valid codes.
+2. Uncapped API calls — risks exceeding the $6.00 brief budget. Implemented a $4.00 hard budget limit that automatically shuts off the stage if exceeded.
+3. Crashing on API failure — violates the >90% prediction requirement. Any API error or timeout automatically degrades gracefully to baseline candidates.
+
+**What decided it:** Satisfies P2 requirement 4. Verified by unit tests in `tests/test_llm_reranker.py` covering candidate gating, spend guard shutoff, disabled baseline mode, and error fallback.

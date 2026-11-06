@@ -3,11 +3,9 @@ Combines extraction, assertion filtering, hybrid retrieval, hierarchy navigation
 """
 
 import json
-import os
-import re
 import sys
 import traceback
-from typing import Dict, Any, List, Optional, Tuple, Set
+from typing import Any
 
 try:
     import torch
@@ -15,13 +13,14 @@ try:
 except Exception:
     pass
 
-from text_utils import normalize_code, clean_text, expand_abbreviations
 from assertion_filter import AssertionFilter, split_sentences_and_clauses
 from diagnosis_extractor import DiagnosisExtractor
 from icd_hierarchy import ICDHierarchy
-from retrieval import HybridRetriever
-from reranker import RuleReranker
+from llm_reranker import LLMReranker
 from multilingual import detect_language, translate_clinical_text
+from reranker import RuleReranker
+from retrieval import HybridRetriever
+from text_utils import clean_text, expand_abbreviations, normalize_code
 
 # High-frequency default outpatient codes if text is completely empty or unindexable
 DEFAULT_OUTPATIENT_CODES = ["1F40.Z", "CA40.Z", "1A07.Z"]
@@ -47,7 +46,7 @@ class ICD11Pipeline:
 
         # Load valid codes set
         with open(valid_codes_path, "r", encoding="utf-8") as f:
-            self.valid_codes: Set[str] = set(json.load(f))
+            self.valid_codes: set[str] = set(json.load(f))
 
         # Load enriched KB & hierarchy
         self.hierarchy = ICDHierarchy(kb_path)
@@ -64,6 +63,7 @@ class ICD11Pipeline:
             kb_path=kb_path,
         )
         self.reranker = RuleReranker(self.kb)
+        self.llm_reranker = LLMReranker(self.valid_codes, self.kb)
 
         # Run startup self-test note
         self._run_self_test()
@@ -82,7 +82,7 @@ class ICD11Pipeline:
         except Exception as e:
             sys.stderr.write(f"[WARN] Pipeline startup self-test error: {e}\n")
 
-    def _get_bm25_fallback(self, raw_text: str) -> List[str]:
+    def _get_bm25_fallback(self, raw_text: str) -> list[str]:
         """Emit best BM25 codes for the note text on unexpected failure, never a constant."""
         if not raw_text or not raw_text.strip():
             return DEFAULT_OUTPATIENT_CODES
@@ -105,7 +105,7 @@ class ICD11Pipeline:
 
         return DEFAULT_OUTPATIENT_CODES
 
-    def predict_note(self, note: Dict[str, Any]) -> Dict[str, Any]:
+    def predict_note(self, note: dict[str, Any]) -> dict[str, Any]:
         """Predict top-3 ICD-11 codes for a clinical note."""
         note_id = note.get("id", "unknown")
         raw_text = note.get("text", "")
@@ -162,8 +162,8 @@ class ICD11Pipeline:
             expanded_candidates = self.hierarchy.expand_candidates(filtered_candidates, max_expansions=50)
 
             # 6. Resolve all candidates to valid leaf codes
-            resolved_candidates: List[Tuple[str, float]] = []
-            seen_codes: Set[str] = set()
+            resolved_candidates: list[tuple[str, float]] = []
+            seen_codes: set[str] = set()
 
             for code, score in expanded_candidates:
                 leaf_code = self.hierarchy.resolve_to_leaf(code, primary_query or filtered_note_text)
@@ -183,6 +183,17 @@ class ICD11Pipeline:
             # 8. Diversity selection for top-3
             selected_codes = self._select_diverse_top3(reranked, primary_query, expanded_text)
 
+            # Optional LLM reranking stage (only when USE_LLM_RERANK=1 and key is present)
+            if self.llm_reranker.is_enabled():
+                candidate_codes = [c[0] for c in reranked[:20]]
+                selected_codes = self.llm_reranker.rerank_note(
+                    note_id=note_id,
+                    note_text=raw_text,
+                    translated_text=input_text if input_text != raw_text else None,
+                    candidate_codes=candidate_codes or selected_codes,
+                    max_output=3,
+                )
+
             # 9. Fallback if empty
             if not selected_codes:
                 selected_codes = self._get_bm25_fallback(raw_text)
@@ -198,15 +209,15 @@ class ICD11Pipeline:
 
     def _select_diverse_top3(
         self,
-        ranked_candidates: List[Tuple[str, float]],
+        ranked_candidates: list[tuple[str, float]],
         query_text: str,
         note_text: str,
-    ) -> List[str]:
+    ) -> list[str]:
         """Select diverse top-3 codes: primary best leaf, specificity alternative (.Z/child), and distinct diagnosis."""
         if not ranked_candidates:
             return []
 
-        selected: List[str] = []
+        selected: list[str] = []
 
         # Code 1: Best ranked leaf candidate
         primary_code = ranked_candidates[0][0]
