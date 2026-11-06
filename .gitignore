@@ -35,8 +35,11 @@ Thumbs.db
 # Model cache (too large for git, built at docker build time)
 models/cache/
 
-# Output
-out/
+# Output & Input mount folders
+out/*
+!out/.gitkeep
+in/*
+!in/.gitkeep
 predictions*.jsonl
 !data/predictions.example.jsonl
 *.bundle

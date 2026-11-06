@@ -26,11 +26,13 @@ COPY diagnosis_extractor.py .
 COPY icd_hierarchy.py .
 COPY retrieval.py .
 COPY reranker.py .
+COPY multilingual.py .
 COPY pipeline.py .
 COPY build_kb.py .
 COPY build_index.py .
 COPY entrypoint.py .
 COPY evaluate.py .
+COPY tests/ tests/
 
 # Copy MMS source data
 COPY data/mms-2026-01.json data/mms-2026-01.json
