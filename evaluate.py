@@ -84,7 +84,7 @@ def bootstrap_ci(results: List[Dict[str, Any]], n_resamples: int = 1000, alpha: 
 
     return {
         "score_ci": (float(np.percentile(b_scores, low_p)), float(np.percentile(b_scores, high_p))),
-        "top1_ci": (float(np.percentile(b_top1s, low_p)), float(np.percentile(b_top3s, high_p))),
+        "top1_ci": (float(np.percentile(b_top1s, low_p)), float(np.percentile(b_top1s, high_p))),
         "top3_ci": (float(np.percentile(b_top3s, low_p)), float(np.percentile(b_top3s, high_p))),
     }
 

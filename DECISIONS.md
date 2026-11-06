@@ -122,3 +122,17 @@
 2. Store `dev_notes.jsonl` in `data/` and `score.py` at repository root — makes the repo completely autonomous and runnable from a fresh clone.
 
 **What decided it:** Satisfies P0 requirement 1.1. Verified that `python score.py --gold data/dev_notes.jsonl --pred out/dev_predictions.jsonl --mms data/mms-2026-01.json` reproduces the exact 45.83 / 75.0 (61.11 / 100) dev benchmark score.
+
+
+---
+
+## Entry 9 — 2026-11-06 17:10 IST — Corrected Bootstrap Confidence Interval Bug & Synthetic Validation
+
+**Task:** 1.5  
+**Decision:** Correct the bootstrap confidence interval calculation in `evaluate.py`. The upper bound for `top1_ci` was inadvertently referencing `b_top3s` instead of `b_top1s`, artificially inflating the 55% Top-1 upper bound to 85.0%. Added unit test `tests/test_bootstrap_ci.py` validating percentile estimation on synthetic binomial cases.
+
+**Options considered:**
+1. Leave reporting uncorrected — misleadingly claims Top-1 CI reaches 85.0% on 60 notes.
+2. Fix index array reference and validate against exact normal approximation ($0.55 \pm 1.96 \sqrt{0.55 \times 0.45 / 60}$) — confirms symmetrical distribution `[43.3%, 68.3%]`.
+
+**What decided it:** Fixed bug and verified via unit test. Re-evaluated dev notes: Top-1 95% CI is now `[43.3%, 68.3%]`, Top-3 95% CI is `[61.7%, 85.0%]`, and Score 95% CI is `[37.92, 54.18]`.

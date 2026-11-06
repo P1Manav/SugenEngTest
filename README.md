@@ -6,7 +6,7 @@ An offline ICD-11 coding system that reads outpatient consult notes and proposes
 
 | Metric | Value |
 |--------|-------|
-| Top-1 Accuracy (Slice A) | 55.00% (95% CI: [43.3%, 85.0%]) |
+| Top-1 Accuracy (Slice A) | 55.00% (95% CI: [43.3%, 68.3%]) |
 | Top-3 Accuracy (Slice A) | 73.33% (95% CI: [61.7%, 85.0%]) |
 | Score (dev, /75) | 45.83 / 75.0 (Normalized: 61.11 / 100) |
 | Score 95% Bootstrap CI | [37.92, 54.18] |
