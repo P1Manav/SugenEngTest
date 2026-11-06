@@ -1,0 +1,12 @@
+version: "3.8"
+
+services:
+  coder:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: icd11-coder:latest
+    volumes:
+      - ./in:/in:ro
+      - ./out:/out:rw
+    entrypoint: ["python", "entrypoint.py"]

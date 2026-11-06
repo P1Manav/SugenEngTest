@@ -1,0 +1,57 @@
+# Do NOT push the public/ folder (contains provided data pack)
+public/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+._*
+
+# Docker
+.docker/
+
+# Model cache (too large for git, built at docker build time)
+models/cache/
+
+# Output
+out/
+predictions*.jsonl
+!data/predictions.example.jsonl
+
+# Temp
+*.tmp
+*.bak
+scratch/
+
+# Large model files that are downloaded at build time
+*.onnx
+*.bin
+*.safetensors
+*.pt
+*.pth
+*.npy
+!kb/*.json
+!kb/*.pkl
+

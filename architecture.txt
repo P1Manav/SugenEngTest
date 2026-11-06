@@ -1,0 +1,121 @@
+flowchart TD
+  subgraph BUILD["BUILD TIME - no LLM anywhere - your PC (3060 Ti for training and ONNX export)"]
+    direction TB
+    MMS["mms-2026-01.json<br/>18,375 codes, titles only"]
+    WHO["WHO ICD-11 API / release<br/>synonyms, index terms, inclusions,<br/>exclusions, definitions,<br/>titles in other languages"]
+    MAP["WHO ICD-10 to ICD-11 map<br/>+ ICD-10 titles"]
+    ENR["Enriched multilingual code KB<br/>tree, .Y/.Z siblings, leaf/residual,<br/>qualifier terms per code"]
+    MMS --> ENR
+    WHO --> ENR
+    MAP --> ENR
+    ENR --> IDX1["BM25 index"]
+    ENR --> IDX2["BGE-M3 dense index<br/>codes + ICD-10 titles"]
+    ENR --> TPL["Rule-based note generator<br/>templates x 3 styles x abbreviations<br/>negation / history / comorbidity distractors<br/>NO LLM"]
+    REAL["Real public corpora<br/>licence-checked, silver labels via WHO map"]
+    TPL --> TRAIN["Training and eval data<br/>templates + silver + KB synonym pairs"]
+    REAL --> TRAIN
+    TRAIN --> FT["v3 only: fine-tune bi-encoder / reranker<br/>sibling hard negatives"]
+    TRAIN --> LTR["Train LightGBM learning-to-rank<br/>cross-validated, not tuned on dev"]
+    ENR --> MT["Local MT models for non-English<br/>NLLB distilled / opus-mt, int8"]
+    IDX1 --> ART["Shipped artifacts in image:<br/>KB, indexes, ONNX int8 models,<br/>MT models, ranker, rules"]
+    IDX2 --> ART
+    FT --> ART
+    LTR --> ART
+    MT --> ART
+  end
+
+  subgraph RUN["RUN TIME - 8 CPU, 16 GB, 60 min, NO network, NO API keys"]
+    direction TB
+    IN["notes.jsonl<br/>id, text"]
+    LANG["Language detect<br/>fastText lid"]
+    MTR["Translate to English if needed<br/>keep original too"]
+    IN --> LANG --> MTR
+
+    subgraph EXTRACT["Rule-based diagnosis extraction - replaces LLM rewrite"]
+      direction TB
+      SEC["Section parser<br/>A: Imp: Dx: Assessment lines"]
+      DLG["Transcript finder<br/>doctor statements: this is / so this is / I think this is"]
+      NEG["Assertion filter<br/>negated, ruled out, history of,<br/>differential with question mark,<br/>family history, comorbidity-only"]
+      CUE["Specificity cue extractor<br/>acute chronic severity site laterality<br/>organism confirmed uncomplicated"]
+      SEC --> NEG
+      DLG --> NEG
+      NEG --> CUE
+    end
+    MTR --> SEC
+    MTR --> DLG
+
+    subgraph CAND["Candidate generation - target recall at 30-50"]
+      direction LR
+      Q1["Original text"]
+      Q2["Translated text"]
+      Q3["Extracted diagnosis phrases"]
+      R1["BM25"]
+      R2["BGE-M3 dense"]
+      R3["ICD-10 title retrieval<br/>mapped to ICD-11 via WHO map"]
+      Q1 --> R1
+      Q1 --> R2
+      Q2 --> R1
+      Q2 --> R2
+      Q3 --> R1
+      Q3 --> R2
+      Q3 --> R3
+    end
+    MTR --> Q1
+    MTR --> Q2
+    NEG --> Q3
+
+    R1 --> FUSE["RRF fusion + dedupe"]
+    R2 --> FUSE
+    R3 --> FUSE
+    FUSE --> EXP["Hierarchy / sibling expansion<br/>children, parent, .Y and .Z siblings"]
+    EXP --> CE["Cross-encoder rerank, CPU<br/>benchmarked: smaller model or<br/>top 15-20 with 256 token cap"]
+    CE --> LTRR["LightGBM ranker features<br/>BM25, dense, rerank score, ICD-10 hit,<br/>in-assessment flag, negation flag,<br/>depth, leaf, residual, cue-match"]
+    CUE --> DESC["Specificity descent<br/>match cues to child qualifiers<br/>else fall back to .Z"]
+    LTRR --> DESC
+    DESC --> DIV["Diverse top-3<br/>specific, .Z or sibling, alt diagnosis<br/>chosen by dev ablation"]
+    DIV --> VAL["Validate against MMS list<br/>strip invalid, pad to 3"]
+    VAL --> OUT["predictions.jsonl<br/>written per note, flushed"]
+  end
+
+  ART -.-> CAND
+  ART -.-> CE
+  ART -.-> LTRR
+
+  subgraph HYG["RUNTIME HYGIENE AND DEGRADATION"]
+    direction TB
+    H1["multiprocessing across 8 CPUs"]
+    H2["hard per-note timeout"]
+    H3["resume from partial output"]
+    H4["global time budget"]
+    H5["if running late: skip reranker,<br/>then skip MT, then BM25 + dense only"]
+    H1 --> H2 --> H3 --> H4 --> H5
+  end
+  RUN -.-> HYG
+
+  subgraph EVAL["EVALUATION AND ABLATION LOOP"]
+    direction TB
+    DEV["60 dev notes held out"]
+    E1["score.py with bootstrap confidence intervals"]
+    E2["Candidate recall at 30 and 50"]
+    E3["Failure tags: wrong visit diagnosis,<br/>missed retrieval, wrong specificity, language"]
+    E4["Hand-made multilingual multi-chapter set<br/>+ real-text silver set"]
+    E5["Time per 600 notes on 8 CPUs, RAM, image size"]
+    LOG["DECISIONS.md: added X, gained Y, kept or dropped"]
+    DEV --> E1
+    E4 --> E1
+    E1 --> E3
+    E2 --> E3
+    E3 --> LOG
+    E5 --> LOG
+  end
+  OUT -.-> EVAL
+
+  subgraph ROAD["BUILD ORDER - each step is a logged ablation"]
+    direction LR
+    V0["v0: BM25 + BGE-M3 + RRF<br/>+ validation + .Z rules"]
+    V1["v1: rule-based extraction + negation filter<br/>+ sibling expansion"]
+    V2["v2: cross-encoder + ICD-10 title retrieval<br/>+ multilingual KB titles + local MT"]
+    V3["v3: LightGBM ranker,<br/>then fine-tune only if recall is the bottleneck"]
+    V0 --> V1 --> V2 --> V3
+  end
+  EVAL -.-> ROAD
