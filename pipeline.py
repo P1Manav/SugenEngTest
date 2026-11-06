@@ -8,7 +8,7 @@ import re
 from typing import Dict, Any, List, Optional, Tuple, Set
 
 from text_utils import normalize_code, clean_text, expand_abbreviations
-from assertion_filter import AssertionFilter
+from assertion_filter import AssertionFilter, split_sentences_and_clauses
 from diagnosis_extractor import DiagnosisExtractor
 from icd_hierarchy import ICDHierarchy
 from retrieval import HybridRetriever
@@ -69,6 +69,16 @@ class ICD11Pipeline:
             primary_query = extracted["primary_query"]
             extracted_phrases = extracted["phrases"]
             expanded_text = extracted["expanded_text"]
+
+            # Filter extracted phrases to strictly affirmed clauses (drop e.g. "malaria excluded")
+            affirmed_phrases = []
+            for p in extracted_phrases:
+                for cl in split_sentences_and_clauses(p):
+                    if self.assertion_filter.check_clause_assertion(cl)["affirmed"]:
+                        affirmed_phrases.append(cl)
+            if affirmed_phrases:
+                primary_query = " ".join(affirmed_phrases)
+                extracted_phrases = affirmed_phrases
 
             # 2. Filter out negated clauses and previous misdiagnoses from note text
             filtered_note_text, rejected_clauses = self.assertion_filter.filter_text_for_retrieval(expanded_text)

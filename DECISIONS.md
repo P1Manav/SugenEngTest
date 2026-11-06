@@ -45,3 +45,49 @@
 **What decided it:** Fixing the vaccination negation bug restored `1D80.0` for dev-019. Demoting Chapter 21 symptoms increased Top-1 accuracy on the dev set from 35.0% to 45.0% and Top-3 accuracy to 63.3%, lifting the official score from 30.4 to 38.3 / 75.0 (51.1 / 100).
 
 **Revisit:** Train a lightweight binary classifier for assertion detection if more ambiguous complex clinical narratives emerge in hidden sets.
+
+
+---
+
+## Entry 4 — 2026-11-06 14:50 IST — Intra-Sentence Assertion Splitting & Confirmed Clause Isolation
+
+**Commit:** v1-assertion-clause-splitting  
+**Decision:** Split sentences on commas and semicolons when evaluating diagnostic assertions (`split_sentences_and_clauses`), ensuring that trailing negative clauses (e.g., `malaria excluded` or `mRDT NEG`) do not falsely negate the primary diagnosis in compound diagnostic sentences like `Dx viral URTI, malaria excluded`.
+
+**Options considered:**
+1. Sentence-level assertion windowing — negations within 6 tokens negated the entire sentence, dropping `viral URTI` when `malaria excluded` appeared on the same line.
+2. Comma and punctuation-aware clause segmentation — isolating `Dx viral URTI` (affirmed) from `malaria excluded` (negated).
+
+**What decided it:** In `dev-002`, `Dx viral URTI, malaria excluded` was incorrectly flagged as negated, which suppressed `CA07.0` and `CA00`. With clause-level assertion isolation, `viral URTI` was affirmed as the primary retrieval query, while `malaria` was safely dropped.
+
+**Revisit:** Maintain clause isolation rules if multi-clause complex compound diagnoses appear in generalisation sets.
+
+---
+
+## Entry 5 — 2026-11-06 15:00 IST — Clinical Abbreviation Expansion, .Y Demotion, and Complication Alignment
+
+**Commit:** v1-reranker-and-abbreviations  
+**Decision:** Expand high-frequency East African / outpatient clinical abbreviations (e.g. `thrush`, `vaginal thrush`, `dysentery`, `frozen shoulder`, `plantar fasciitis`, `GDM`, `CCF`) in `text_utils.py`, apply a penalty to `.Y` ("Other specified") codes relative to `.Z` ("Unspecified"), and add uncomplicated/complication clinical alignment bonuses in `RuleReranker`.
+
+**Options considered:**
+1. Leave abbreviations unexpanded — dense embeddings and BM25 missed specific matches like `JA63.2` for `GDM` or `1A36.00` for `amoebic dysentery`.
+2. Treat `.Y` and `.Z` equally — in real outpatient practice, `.Y` codes are almost never used when `.Z` or specific children apply; dev set has 0 `.Y` gold codes versus 14 `.Z` gold codes.
+3. Align uncomplicated presentations with `.0` / `.Z` and penalize complicated/cerebral codes unless complications are explicitly evidenced.
+
+**What decided it:** This combination increased Top-1 from 45.0% to 55.0% and Top-3 from 63.3% to 73.3%, raising the official score to 45.83 / 75.0 (Normalized: **61.11 / 100**), with candidate Recall@30 at 88.3% and Recall@50 at 93.3%.
+
+**Revisit:** Monitor candidate recall on non-English / generalisation inputs.
+
+---
+
+## Entry 6 — 2026-11-06 15:10 IST — Specific Child Descent vs Blind .Z Promotion
+
+**Commit:** v1-specificity-descent-analysis  
+**Decision:** Specificity descent from a family to a specific child must be strictly evidence-based (requiring differential qualifier matches in the note text) rather than blind ranking promotion of specific siblings over `.Z`.
+
+**Options considered:**
+1. Unconditionally swap .Z with highest-ranked specific child — tested via ablation, which dropped dev score from 45.83 to 44.17 because true unspecified cases (e.g. `1F40.Z` Falciparum malaria, unspecified) were incorrectly promoted to false specific subtypes.
+2. Keep normalized token overlap in `RuleReranker` to prevent length bias — unnormalized token overlap was tested and dropped score to 32.08 because long category titles accumulated spurious word matches.
+3. Retain principled balance between retrieval relevance and targeted clinical alignment.
+
+**What decided it:** Empirical ablation confirmed that raw length-unnormalized matching degrades general retrieval stability. Controlled clinical alignment preserves the 61.11 / 100 benchmark score.

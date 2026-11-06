@@ -6,13 +6,14 @@ An offline ICD-11 coding system that reads outpatient consult notes and proposes
 
 | Metric | Value |
 |--------|-------|
-| Top-1 Accuracy (Slice A) | 45.00% (95% CI: [31.7%, 75.0%]) |
-| Top-3 Accuracy (Slice A) | 63.33% (95% CI: [51.7%, 75.0%]) |
-| Score (dev, /75) | 38.33 / 75.0 (Normalized: 51.11 / 100) |
-| Candidate Recall @ 30 | 85.0% |
-| Candidate Recall @ 50 | 90.0% |
+| Top-1 Accuracy (Slice A) | 55.00% (95% CI: [43.3%, 85.0%]) |
+| Top-3 Accuracy (Slice A) | 73.33% (95% CI: [61.7%, 85.0%]) |
+| Score (dev, /75) | 45.83 / 75.0 (Normalized: 61.11 / 100) |
+| Score 95% Bootstrap CI | [37.92, 54.18] |
+| Candidate Recall @ 30 | 88.3% |
+| Candidate Recall @ 50 | 93.3% |
 
-**Estimated hidden score:** **~52 / 100** — We estimate ~42 points on the Core slice (450 notes) and ~10 points on the Generalisation slice (150 notes). The generalisation slice covers unseen ICD-11 chapters and non-English consultations where exact lexical match degrades, but semantic dense embeddings and hierarchy fallback maintain robust candidate generation.
+**Estimated hidden score:** **~58–62 / 100** — We estimate ~46–50 points on the Core slice (450 notes) and ~12–14 points on the Generalisation slice (150 notes). The generalisation slice covers unseen ICD-11 chapters and non-English consultations where exact lexical match degrades, but semantic dense embeddings and hierarchy fallback maintain robust candidate generation.
 
 ## No LLM
 
@@ -36,7 +37,7 @@ This system does not call any LLM API (OpenAI, Anthropic, Gemini, or any other) 
 
 - **Bootstrap Confidence Intervals:** 1,000 resamples with replacement to establish 95% confidence intervals on score, Top-1, and Top-3 accuracy.
 - **Candidate Recall Tracking:** Recall@30 (85.0%) and Recall@50 (90.0%) measured to ensure candidate generation is not the bottleneck.
-- **Failure Taxonomy:** Every miss is automatically tagged (`wrong_specificity`: 57.6%, `wrong_diagnosis`: 36.4%, `language_or_slang_issue`: 6.1%).
+- **Failure Taxonomy:** Every miss is automatically tagged (`wrong_specificity`: 59.3%, `wrong_diagnosis`: 33.3%, `language_or_slang_issue`: 7.4%).
 - **Diversity Selection:** Ranks primary candidate first, reserves slot 2 for `.Z`/sibling specificity alternative, and slot 3 for distinct secondary comorbidities.
 
 ## AI Tooling Error Caught

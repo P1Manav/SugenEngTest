@@ -123,7 +123,7 @@ CONJUNCTIONS = re.compile(r"\b(but|however|although|except|whereas|save\s+for|pr
 def split_sentences_and_clauses(text: str) -> List[str]:
     """Split text into sentences and short clause fragments based on punctuation."""
     # Split by periods, commas, semicolons, colons, newlines, tabs
-    clauses = re.split(r"[\n\r;.]+", text)
+    clauses = re.split(r"[\n\r;.]+|,\s*", text)
     cleaned = []
     for c in clauses:
         c = c.strip()

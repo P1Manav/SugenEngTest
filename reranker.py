@@ -57,7 +57,29 @@ class RuleReranker:
         if chapter == "21" or code.startswith("M"):
             score -= 0.025
 
-        # 4. Prefer leaf codes over non-leaf
+        # 4. Demote .Y (Other specified) codes relative to .Z (Unspecified)
+        if code.endswith(".Y") or code.endswith("Y"):
+            score -= 0.015
+
+        # 5. Demote critical clinical mismatch (e.g. abscess when not mentioned)
+        critical_mismatch = ["abscess", "fracture", "neoplasm", "carcinoma", "malignant", "congenital"]
+        note_lower = note_text.lower()
+        for term in critical_mismatch:
+            if term in title and term not in note_lower:
+                score -= 0.035
+
+        # 6. Uncomplicated / complicated clinical alignment
+        if "uncomplicated" in note_lower or "no complication" in note_lower:
+            if "without complication" in title or code.endswith(".Z") or code.endswith("Z"):
+                score += 0.035
+            if "with complication" in title or "cerebral" in title:
+                score -= 0.05
+
+        # 7. Bacteriologically confirmed alignment
+        if "confirmed" in note_lower and "confirmed" in title:
+            score += 0.04
+
+        # 8. Prefer leaf codes over non-leaf
         if not info.get("leaf", False):
             score -= 0.05
 
