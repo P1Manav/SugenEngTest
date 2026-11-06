@@ -108,3 +108,17 @@
 **What decided it:** Validated against a hand-crafted multilingual test suite (`tests/test_multilingual.py`) covering Swahili, Spanish, and French notes across infectious, respiratory, musculoskeletal, and gynecological chapters. Achieved **83.3% Top-1** (5/6) and **100.0% Top-3** (6/6) accuracy with zero degradation to dev scores.
 
 **Revisit:** Extend clinical mapping dictionaries if additional regional dialect markers emerge.
+
+
+---
+
+## Entry 8 — 2026-11-06 17:05 IST — Localized Evaluation Data, Official Grader, and Evaluation Runner
+
+**Task:** 1.1  
+**Decision:** Migrate `dev_notes.jsonl`, `predictions.example.jsonl`, and `score.py` directly into the repository root and `data/` directory, update all path references across `evaluate.py`, `build_kb.py`, and analysis scripts, and add `scripts/run_eval.sh`.
+
+**Options considered:**
+1. Keep evaluation assets in `public/` — violates self-contained repo requirement when `public/` is excluded from git.
+2. Store `dev_notes.jsonl` in `data/` and `score.py` at repository root — makes the repo completely autonomous and runnable from a fresh clone.
+
+**What decided it:** Satisfies P0 requirement 1.1. Verified that `python score.py --gold data/dev_notes.jsonl --pred out/dev_predictions.jsonl --mms data/mms-2026-01.json` reproduces the exact 45.83 / 75.0 (61.11 / 100) dev benchmark score.

@@ -1,6 +1,6 @@
 import json
 
-with open("public/data/dev_notes.jsonl", encoding="utf-8") as f:
+with open("data/dev_notes.jsonl", encoding="utf-8") as f:
     golds = {json.loads(l)["id"]: json.loads(l) for l in f if l.strip()}
 
 with open("out/dev_predictions.jsonl", encoding="utf-8") as f:

@@ -121,7 +121,6 @@ def build_kb(mms_path: str, kb_dir: str):
 
 if __name__ == "__main__":
     mms_candidates = [
-        "public/data/mms-2026-01.json",
         "data/mms-2026-01.json",
         "/data/mms-2026-01.json",
     ]

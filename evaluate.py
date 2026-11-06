@@ -90,7 +90,7 @@ def bootstrap_ci(results: List[Dict[str, Any]], n_resamples: int = 1000, alpha: 
 
 
 def evaluate(
-    gold_path: str = "public/data/dev_notes.jsonl",
+    gold_path: str = "data/dev_notes.jsonl",
     pred_path: Optional[str] = None,
     output_pred_path: str = "out/dev_predictions.jsonl",
     mms_path: str = "kb/valid_codes.json",
@@ -235,7 +235,7 @@ def evaluate(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--gold", default="public/data/dev_notes.jsonl")
+    parser.add_argument("--gold", default="data/dev_notes.jsonl")
     parser.add_argument("--pred", default=None)
     parser.add_argument("--out", default="out/dev_predictions.jsonl")
     parser.add_argument("--mms", default="kb/valid_codes.json")
