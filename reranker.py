@@ -186,14 +186,15 @@ class RuleReranker:
         if chapter == "21" or code.startswith("M"):
             score -= 0.05
 
-        # Traditional medicine (Chapter 26) demotion
+        # Traditional medicine (Chapter 26) demotion only if no traditional medicine terms in note
         if chapter == "26" or code.startswith("S"):
-            score -= 0.35
+            if not any(g in note_lower for g in ["traditional", "tcm", "qi", "yin", "yang", "herbal", "acupuncture", "kampo", "ayurveda"]):
+                score -= 0.08
 
         # Developmental / genetic anomaly (Chapter 20) demotion for standard outpatient notes
         if chapter == "20" or code.startswith("LD"):
-            if not any(g in note_lower for g in ["syndrome", "genetic", "congenital", "anomaly", "malformation", "dysmorphic"]):
-                score -= 0.35
+            if not any(g in note_lower for g in ["syndrome", "genetic", "congenital", "anomaly", "malformation", "dysmorphic", "trisomy", "chromosom"]):
+                score -= 0.08
 
         # 5. Demote .Y (Other specified) codes relative to .Z (Unspecified)
         if is_other_specified:
@@ -209,9 +210,9 @@ class RuleReranker:
             if term in title and term not in note_lower:
                 score -= 0.06
 
-        # 7. Biological sex consistency checks
-        is_male = bool(re.search(r"\b(\d{1,3}\s*M|male|man|boy|gentleman)\b", note_text, re.IGNORECASE))
-        is_female = bool(re.search(r"\b(\d{1,3}\s*F|female|woman|girl|lady|primigravida|gravida|para|lmp)\b", note_text, re.IGNORECASE))
+        # 7. Biological sex consistency checks (multilingual support)
+        is_male = bool(re.search(r"\b(\d{1,3}\s*M|male|man|boy|gentleman|homme|garçon|garcon|masculino|hombre|niño|nino|varón|varon|kiume|mwanaume|男性|男)\b", note_text, re.IGNORECASE))
+        is_female = bool(re.search(r"\b(\d{1,3}\s*F|female|woman|girl|lady|femme|fille|femenino|mujer|niña|nina|kike|mwanamke|primigravida|gravida|para|lmp|anc|antenatal|enceinte|embarazada|gravidez|gestante|ujauzito|mimba|女性|女)\b", note_text, re.IGNORECASE))
         if is_male:
             # Male patients cannot have obstetric/puerperal codes (Ch 18) or female genital (GA)
             if chapter == "18" or code.startswith(("JA", "JB", "GA")):
@@ -221,9 +222,13 @@ class RuleReranker:
             if code.startswith("GB"):
                 score -= 0.40
 
-        # 8. Age & life-stage consistency
-        age_match = re.search(r"\b(\d{1,3})\s*(?:yo|y/o|yr|yrs|year|years|-year-old|M|F)\b", note_text, re.IGNORECASE)
-        age = int(age_match.group(1)) if age_match else None
+        # 8. Age & life-stage consistency (multilingual support)
+        age_match = re.search(r"\b(\d{1,3})\s*(?:yo|y/o|yr|yrs|year|years|-year-old|ans|années|annees|años|anos|miaka|岁|歲)\b|\b(?:age[d\s:]+|edad\s*[:\s]+|âge\s*[:\s]+|idade\s*[:\s]+|miaka\s+)(\d{1,3})\b|\b(\d{1,3})\s*[MF]\b", note_text, re.IGNORECASE)
+        age = None
+        if age_match:
+            age_str = next((g for g in age_match.groups() if g is not None), None)
+            if age_str:
+                age = int(age_str)
         if age is not None:
             if age >= 18:
                 # Adults cannot have neonatal diseases or conditions of prematurity
@@ -237,8 +242,8 @@ class RuleReranker:
                 elif "in children" in title or "child" in title:
                     score += 0.06
 
-        # 9. Pregnancy & obstetric consistency
-        is_pregnant = bool(re.search(r"\b(anc\b|antenatal|pregnant|pregnancy|gestation|trimester|fundal|fhr|edd|g\d+p\d+|\d+/\d+\s*weeks?)\b", note_text, re.IGNORECASE))
+        # 9. Pregnancy & obstetric consistency (multilingual support)
+        is_pregnant = bool(re.search(r"\b(anc\b|antenatal|pregnant|pregnancy|gestation|trimester|fundal|fhr|edd|g\d+p\d+|\d+/\d+\s*weeks?|enceinte|grossesse|embarazada|embarazo|gravidez|gestante|ujauzito|mimba)\b", note_text, re.IGNORECASE))
         is_not_pregnant = bool(re.search(r"\b(upt\s*neg|pregnancy\s*test\s*neg|not\s*pregnant)\b", note_text, re.IGNORECASE))
         if is_not_pregnant:
             if chapter == "18" or code.startswith(("JA", "JB")):

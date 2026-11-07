@@ -18,10 +18,25 @@ from sentence_transformers import SentenceTransformer
 from text_utils import clean_text, expand_abbreviations, tokenize
 
 
+def ensure_safetensors(model_dir: str):
+    """Recombine split safetensors parts if model.safetensors is not present."""
+    if not os.path.isdir(model_dir):
+        return
+    sf_path = os.path.join(model_dir, "model.safetensors")
+    if not os.path.exists(sf_path):
+        parts = sorted([p for p in os.listdir(model_dir) if p.startswith("model.safetensors.part")])
+        if parts:
+            import shutil
+            with open(sf_path, "wb") as out_f:
+                for part in parts:
+                    with open(os.path.join(model_dir, part), "rb") as in_f:
+                        shutil.copyfileobj(in_f, out_f)
+
+
 def build_indexes(
     kb_path: str = "kb/enriched_kb.json",
     out_dir: str = "kb",
-    model_name_or_path: str = "models/all-MiniLM-L6-v2",
+    model_name_or_path: str = "models/paraphrase-multilingual-MiniLM-L12-v2",
     rebuild_dense: bool = True,
 ):
     """Build BM25 index and precompute dense embeddings for all ICD-11 categories."""
@@ -70,7 +85,9 @@ def build_indexes(
 
     if rebuild_dense or not (os.path.exists(dense_emb_path) and os.path.exists(dense_codes_path)):
         print(f"Loading dense model from {model_name_or_path}...")
-        if not os.path.exists(model_name_or_path):
+        if os.path.isdir(model_name_or_path):
+            ensure_safetensors(model_name_or_path)
+        elif not os.path.exists(model_name_or_path):
             model_name_or_path = "sentence-transformers/all-MiniLM-L6-v2"
         model = SentenceTransformer(model_name_or_path)
 
@@ -98,5 +115,5 @@ def build_indexes(
 if __name__ == "__main__":
     rebuild_dense = "--bm25-only" not in sys.argv
     kb_path = "kb/enriched_kb.json"
-    model_path = "models/all-MiniLM-L6-v2"
+    model_path = "models/paraphrase-multilingual-MiniLM-L12-v2" if os.path.exists("models/paraphrase-multilingual-MiniLM-L12-v2") else "models/all-MiniLM-L6-v2"
     build_indexes(kb_path, "kb", model_path, rebuild_dense=rebuild_dense)

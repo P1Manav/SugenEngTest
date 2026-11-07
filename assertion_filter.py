@@ -133,6 +133,15 @@ def split_sentences_and_clauses(text: str) -> list[str]:
     return cleaned
 
 
+NON_DIAGNOSTIC_TERMS = {
+    "acute", "chronic", "other", "specified", "unspecified", "without",
+    "with", "primary", "secondary", "disease", "disorder", "infection",
+    "syndrome", "type", "part", "site", "mild", "moderate", "severe",
+    "stage", "level", "state", "general", "generalised", "generalized",
+    "mention", "due", "post", "status", "recurrent", "persistent",
+}
+
+
 class AssertionFilter:
     """Classify clinical statements and candidate diagnoses by assertion status."""
 
@@ -185,7 +194,8 @@ class AssertionFilter:
         """Check if a specific disease title is explicitly negated or marked as misdiagnosed in the note.
         Never negates if the candidate title appears in the affirmed diagnosis phrases."""
         cand_lower = candidate_title.lower()
-        words = [w for w in re.split(r"\W+", cand_lower) if len(w) > 3]
+        substantive_words = [w for w in re.split(r"\W+", cand_lower) if len(w) > 3 and w not in NON_DIAGNOSTIC_TERMS]
+        words = substantive_words if substantive_words else [w for w in re.split(r"\W+", cand_lower) if len(w) > 3]
         if not words:
             return False
 
@@ -193,7 +203,7 @@ class AssertionFilter:
         if affirmed_phrases:
             for phrase in affirmed_phrases:
                 p_lower = phrase.lower()
-                if any(w in p_lower for w in words):
+                if any(re.search(r"\b" + re.escape(w) + r"\b", p_lower) for w in words):
                     return False
 
         clauses = split_sentences_and_clauses(note_text)
@@ -203,8 +213,9 @@ class AssertionFilter:
             if "vaccinated" in clause_lower or "immuniz" in clause_lower or "immunis" in clause_lower:
                 continue
 
-            # If at least one key word of disease appears in this clause
-            if any(w in clause_lower for w in words):
+            # Check if substantive disease terms appear with word boundary
+            matched = [w for w in words if re.search(r"\b" + re.escape(w) + r"\b", clause_lower)]
+            if matched:
                 assertion = self.check_clause_assertion(clause)
                 if assertion["negated"] or assertion["misdiagnosis"]:
                     return True

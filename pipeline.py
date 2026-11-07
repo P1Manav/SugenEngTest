@@ -18,7 +18,7 @@ from diagnosis_extractor import DiagnosisExtractor
 from icd_hierarchy import ICDHierarchy
 from multilingual import detect_language, translate_clinical_text
 from reranker import RuleReranker
-from retrieval import HybridRetriever
+from retrieval import HybridRetriever, DEFAULT_DENSE_MODEL
 from text_utils import clean_text, expand_abbreviations, normalize_code
 
 class ICD11Pipeline:
@@ -31,7 +31,7 @@ class ICD11Pipeline:
         bm25_path: str = "kb/bm25.pkl",
         dense_embeddings_path: str = "kb/dense_embeddings.npz",
         dense_codes_path: str = "kb/dense_codes.json",
-        model_path: str = "models/all-MiniLM-L6-v2",
+        model_path: str = DEFAULT_DENSE_MODEL,
         verbose: bool = False,
         use_bm25: bool = True,
         use_dense: bool = True,

@@ -8,15 +8,15 @@ from typing import List, Dict, Any, Optional
 from text_utils import expand_abbreviations, clean_text
 from assertion_filter import split_sentences_and_clauses
 
-# Assessment / Impression / Diagnosis line headers
+# Assessment / Impression / Diagnosis line headers (multilingual)
 RE_ASSESSMENT_HEADER = re.compile(
-    r"(?:^|\n|\b)(?:A|Imp|Dx|Diagnosis|Assessment|Impression|D)\s*[:\-]\s*(.*?)(?=(?:\n\s*(?:P|Plan|Rx|Mx|Ix|S|O|O/E|R/v|Review|Return)\s*[:\-]|\Z))",
+    r"(?:^|\n|\b)(?:A|Imp|Dx|Diagnosis|Assessment|Impression|D|Diagnóstico|Diagnostico|Diagnostic|Utambuzi)\s*[:\-]\s*(.*?)(?=(?:\n\s*(?:P|Plan|Rx|Mx|Ix|S|O|O/E|R/v|Review|Return|Tratamiento|Traitement|Plano|Mpango)\s*[:\-]|\Z))",
     re.IGNORECASE | re.DOTALL,
 )
 
 # Inline diagnosis markers often seen in short consults without clean newlines
 RE_INLINE_DX = re.compile(
-    r"\b(?:Dx|Imp|Impression|Diagnosis|Assessment)\b\s*[:\-]?\s*([^\n.;]+)",
+    r"\b(?:Dx|Imp|Impression|Diagnosis|Assessment|Diagnóstico|Diagnostico|Diagnostic|Utambuzi)\b\s*[:\-]?\s*([^\n.;]+)",
     re.IGNORECASE,
 )
 
@@ -39,6 +39,9 @@ RE_DOCTOR_PATTERNS = [
     re.compile(r"\b(?:the\s+)?([A-Za-z\s]*liver\s+failure[^\n.;:?!–—]*)", re.IGNORECASE),
     re.compile(r"\b(?:the\s+)?([A-Za-z\s]*respiratory\s+failure[^\n.;:?!–—]*)", re.IGNORECASE),
     re.compile(r"\bproblem\s+is\s+([^\n.;:?!–—]+)", re.IGNORECASE),
+    re.compile(r"\b(?:le\s+diagnostic\s+est|vous\s+avez|il\s+s'agit\s+d'un(?:e)?)\s+([^\n.;:?!–—]+)", re.IGNORECASE),
+    re.compile(r"\b(?:el\s+diagn[oó]stico\s+es|tiene|se\s+trata\s+de\s+(?:un|una)?)\s+([^\n.;:?!–—]+)", re.IGNORECASE),
+    re.compile(r"\b(?:huu\s+ni|utambuzi\s+ni|una\s+ugonjwa\s+wa)\s+([^\n.;:?!–—]+)", re.IGNORECASE),
 ]
 
 # Next-action or treatment boundary words to trim trailing clinician speech in transcripts
@@ -99,7 +102,7 @@ class DiagnosisExtractor:
         lines = text.split("\n")
         doctor_lines = []
         for line in lines:
-            if re.match(r"^\s*Doctor\s*:", line, re.IGNORECASE):
+            if re.match(r"^\s*(?:Doctor|Dr|Médecin|Medecin|Médico|Medico|Daktari|Doktor|医生)\s*:", line, re.IGNORECASE):
                 doctor_lines.append(line)
 
         target_text = " ".join(doctor_lines) if doctor_lines else text

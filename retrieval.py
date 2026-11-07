@@ -60,6 +60,28 @@ class BM25Retriever:
         return results
 
 
+def ensure_safetensors(model_dir: str):
+    """Recombine split safetensors parts if model.safetensors is not present."""
+    if not os.path.isdir(model_dir):
+        return
+    sf_path = os.path.join(model_dir, "model.safetensors")
+    if not os.path.exists(sf_path):
+        parts = sorted([p for p in os.listdir(model_dir) if p.startswith("model.safetensors.part")])
+        if parts:
+            import shutil
+            with open(sf_path, "wb") as out_f:
+                for part in parts:
+                    with open(os.path.join(model_dir, part), "rb") as in_f:
+                        shutil.copyfileobj(in_f, out_f)
+
+
+DEFAULT_DENSE_MODEL = (
+    "models/paraphrase-multilingual-MiniLM-L12-v2"
+    if os.path.exists("models/paraphrase-multilingual-MiniLM-L12-v2")
+    else "models/all-MiniLM-L6-v2"
+)
+
+
 class DenseRetriever:
     """Semantic vector retrieval using dense sentence embeddings and cosine similarity."""
 
@@ -67,7 +89,7 @@ class DenseRetriever:
         self,
         embeddings_path: str = "kb/dense_embeddings.npz",
         codes_path: str = "kb/dense_codes.json",
-        model_name_or_path: str = "models/all-MiniLM-L6-v2",
+        model_name_or_path: str = DEFAULT_DENSE_MODEL,
     ):
         # Support both .npz and .npy
         if not os.path.exists(embeddings_path):
@@ -90,8 +112,14 @@ class DenseRetriever:
             self.codes = json.load(f)
 
         from sentence_transformers import SentenceTransformer
-        if not os.path.exists(model_name_or_path):
-            model_name_or_path = "sentence-transformers/all-MiniLM-L6-v2"
+        if os.path.isdir(model_name_or_path):
+            ensure_safetensors(model_name_or_path)
+        elif not os.path.exists(model_name_or_path):
+            model_name_or_path = "models/all-MiniLM-L6-v2"
+            if os.path.isdir(model_name_or_path):
+                ensure_safetensors(model_name_or_path)
+            elif not os.path.exists(model_name_or_path):
+                model_name_or_path = "sentence-transformers/all-MiniLM-L6-v2"
         self.model = SentenceTransformer(model_name_or_path)
 
     def retrieve(self, query: str, top_k: int = 50) -> list[tuple[str, float]]:
@@ -149,7 +177,7 @@ class HybridRetriever:
         bm25_path: str = "kb/bm25.pkl",
         dense_embeddings_path: str = "kb/dense_embeddings.npz",
         dense_codes_path: str = "kb/dense_codes.json",
-        model_path: str = "models/all-MiniLM-L6-v2",
+        model_path: str = DEFAULT_DENSE_MODEL,
         kb_path: str = "kb/enriched_kb.json",
     ):
         self.bm25_retriever = BM25Retriever(bm25_path, kb_path=kb_path)

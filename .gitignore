@@ -34,8 +34,10 @@ Thumbs.db
 # Docker
 .docker/
 
-# Model cache (too large for git, built at docker build time)
+# Model cache & reconstructed binaries (parts are committed under 90MB each)
 models/cache/
+models/**/model.safetensors
+!models/**/model.safetensors.part*
 
 # Output & Input mount folders
 out/*

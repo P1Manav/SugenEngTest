@@ -33,6 +33,19 @@ CLINICAL_QUALIFIER_EQUIVALENTS: dict[str, list[str]] = {
     "left": ["left", "lt", "l side"],
     "complication": ["complication", "complications"],
     "facial": ["facial", "face", "mandible", "jaw"],
+    "confirmed": ["confirmed", "positive", "bacteriologically", "smear", "baar", "culture", "biopsy", "histologically", "histology", "chanya", "positif", "confirmado", "confirmada", "pcr"],
+    "unconfirmed": ["unconfirmed", "suspected", "presumed", "probable", "clinically diagnosed", "without confirmation"],
+    "crisis": ["crisis", "crise", "vaso-occlusive", "painful", "acute chest", "sequestration", "maumivu makali"],
+    "bacterial": ["bacterial", "purulent", "pus", "crust", "crusting", "mucopurulent", "bactérienne", "bacteriana"],
+    "viral": ["viral", "watery", "clear discharge", "adenovirus", "virale"],
+    "allergic": ["allergic", "allergy", "itching", "atopic", "atopique", "alérgica", "alergica"],
+    "mild": ["mild", "légère", "legere", "leve"],
+    "moderate": ["moderate", "modérée", "moderee", "moderado", "moderada"],
+    "severe": ["severe", "sévère", "severe", "grave", "intense", "heavy", "severo", "severa"],
+    "invasive": ["invasive", "infiltrating", "infiltrant", "invasivo", "invasiva"],
+    "autoimmune": ["autoimmune", "hashimoto", "primary", "primitive", "primario", "primaria"],
+    "single": ["single", "first", "premier", "primer", "primera"],
+    "recurrent": ["recurrent", "relapsing", "récidivant", "recurrente"],
 }
 
 STOP_WORDS = {
@@ -44,12 +57,14 @@ STOP_WORDS = {
 class ICDHierarchy:
     """Navigate the ICD-11 category hierarchy and expand candidate sets."""
 
-    def __init__(self, kb_path: str = "kb/enriched_kb.json"):
-        if not os.path.exists(kb_path):
+    def __init__(self, kb_path: str = "kb/enriched_kb.json", kb_dict: dict[str, Any] | None = None):
+        if kb_dict is not None:
+            self.kb = kb_dict
+        elif os.path.exists(kb_path):
+            with open(kb_path, "r", encoding="utf-8") as f:
+                self.kb = json.load(f)
+        else:
             raise FileNotFoundError(f"Enriched KB not found at {kb_path}. Run build_kb.py first.")
-
-        with open(kb_path, "r", encoding="utf-8") as f:
-            self.kb: dict[str, dict[str, Any]] = json.load(f)
 
     def get_info(self, code: str) -> dict[str, Any] | None:
         """Get enriched metadata for a code."""

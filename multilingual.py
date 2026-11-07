@@ -83,6 +83,15 @@ SWAHILI_CLINICAL_MAP = [
     (r"\b(maumivu\s+ya\s+magoti|maumivu\s+ya\s+viungo)\b", "osteoarthritis knee pain arthritis"),
     (r"\b(vidonda\s+vya\s+tumbo)\b", "peptic ulcer disease"),
     (r"\b(asidi|kiungulia)\b", "gastro-oesophageal reflux disease GERD"),
+    (r"\b(seli\s+mundu|anemia\s+ya\s+seli\s+mundu)\b", "sickle cell disease crisis"),
+    (r"\b(kisukari\s+cha\s+aina\s+ya\s+kwanza|kisukari\s+type\s*1)\b", "type 1 diabetes mellitus"),
+    (r"\b(kisukari\s+cha\s+aina\s+ya\s+pili|kisukari\s+type\s*2)\b", "type 2 diabetes mellitus"),
+    (r"\b(kifafa)\b", "epilepsy seizure"),
+    (r"\b(utapiamlo|utapiamlo\s+mkali)\b", "severe acute malnutrition"),
+    (r"\b(saratani\s+ya\s+matiti)\b", "malignant neoplasm of breast"),
+    (r"\b(saratani\s+ya\s+shingo\s+ya\s+kizazi)\b", "cervical cancer neoplasm of cervix"),
+    (r"\b(fangasi\s+ya\s+ubongo|meningitis)\b", "meningitis"),
+    (r"\b(shinikizo\s+la\s+damu\s+la\s+juu)\b", "essential hypertension"),
 ]
 
 SPANISH_CLINICAL_MAP = [
@@ -108,12 +117,29 @@ SPANISH_CLINICAL_MAP = [
     (r"\b(apendicitis\s+aguda)\b", "acute appendicitis"),
     (r"\b(angina\s+de\s+pecho)\b", "angina pectoris"),
     (r"\b(artrosis|osteoartritis)\b", "osteoarthritis"),
+    (r"\b(c[aá]ncer\s+de\s+mama|carcinoma\s+ductal\s+invasivo|carcinoma\s+ductal)\b", "malignant neoplasm of breast carcinoma"),
+    (r"\b(carcinoma\s+basocelular)\b", "basal cell carcinoma"),
+    (r"\b(carcinoma\s+espinocelular|carcinoma\s+epidermoide)\b", "squamous cell carcinoma"),
+    (r"\b(lupus\s+eritematoso\s+sist[eé]mico|les)\b", "systemic lupus erythematosus"),
+    (r"\b(ansiedad\s+generalizada|trastorno\s+de\s+ansiedad)\b", "generalized anxiety disorder"),
+    (r"\b(crisis\s+drepanoc[ií]tica|anemia\s+falciforme)\b", "sickle cell disease crisis"),
+    (r"\b(p[uú]rpura\s+trombocitop[eé]nica)\b", "immune thrombocytopenia purpura"),
+    (r"\b(cetoacidosis\s+diab[eé]tica)\b", "diabetic ketoacidosis"),
+    (r"\b(hipotiroidismo\s+primario|hipotiroidismo)\b", "primary hypothyroidism"),
+    (r"\b(insuficiencia\s+card[ií]aca)\b", "heart failure"),
+    (r"\b(infarto\s+agudo\s+de\s+miocardio|iam)\b", "acute myocardial infarction"),
+    (r"\b(accidente\s+cerebrovascular|ictus|acv)\b", "stroke cerebrovascular accident"),
+    (r"\b(esquizofrenia)\b", "schizophrenia"),
+    (r"\b(depresi[oó]n|trastorno\s+depresivo)\b", "depressive episode depression"),
+    (r"\b(dermatitis\s+at[oó]pica|eccema)\b", "atopic dermatitis eczema"),
+    (r"\b(candidiasis\s+oral|muguet)\b", "oral candidiasis thrush"),
+    (r"\b(glaucoma\s+de\s+[aá]ngulo\s+abierto|glaucoma)\b", "glaucoma"),
 ]
 
 FRENCH_CLINICAL_MAP = [
     (r"\b(paludisme|malaria)\b", "malaria"),
     (r"\b(infection\s+urinaire|cystite\s+aigue|cystite)\b", "urinary tract infection cystitis"),
-    (r"\b(tuberculose\s+respiratoire|tuberculose)\b", "respiratory tuberculosis"),
+    (r"\b(tuberculose\s+respiratoire|tuberculose\s+pulmonaire|tuberculose)\b", "respiratory tuberculosis pulmonary"),
     (r"\b(pneumonie\s+aigue|pneumonie)\b", "acute pneumonia"),
     (r"\b(bronchite\s+aigue|bronchite)\b", "acute bronchitis"),
     (r"\b(gastro-enterite\s+aigue|gastro-enterite)\b", "infectious gastroenteritis"),
@@ -130,6 +156,18 @@ FRENCH_CLINICAL_MAP = [
     (r"\b(abces\s+de\s+l'oreille)\b", "abscess of external ear"),
     (r"\b(toxicite\s+medicamenteuse)\b", "drug toxicity"),
     (r"\b(covid-19)\b", "COVID-19"),
+    (r"\b(purpura\s+thrombop[eé]nique|purpura\s+immunologique)\b", "immune thrombocytopenia purpura"),
+    (r"\b(lupus\s+[eé]ryth[eé]mateux\s+diss[eé]min[eé]|led)\b", "systemic lupus erythematosus"),
+    (r"\b(an[eé]mie\s+[aà]\s+cellules\s+falciformes|dr[eé]panocytose)\b", "sickle cell disease"),
+    (r"\b(cancer\s+du\s+sein|carcinome\s+canalaire)\b", "malignant neoplasm of breast"),
+    (r"\b(carcinome\s+basocellulaire)\b", "basal cell carcinoma"),
+    (r"\b(carcinome\s+[eé]pidermo[iï]de)\b", "squamous cell carcinoma"),
+    (r"\b(insuffisance\s+cardiaque)\b", "heart failure"),
+    (r"\b(infarctus\s+du\s+myocarde)\b", "acute myocardial infarction"),
+    (r"\b(accident\s+vasculaire\s+c[eé]r[eé]bral|avc)\b", "stroke cerebrovascular accident"),
+    (r"\b(anxi[eé]t[eé]\s+g[eé]n[eé]ralis[eé]e)\b", "generalized anxiety disorder"),
+    (r"\b([eé]pisode\s+d[eé]pressif|d[eé]pression)\b", "depressive episode depression"),
+    (r"\b(gale)\b", "scabies"),
 ]
 
 PORTUGUESE_CLINICAL_MAP = [
@@ -140,6 +178,17 @@ PORTUGUESE_CLINICAL_MAP = [
     (r"\b(doenca\s+do\s+refluxo\s+gastroesofagico|refluxo)\b", "gastroesophageal reflux disease GERD"),
     (r"\b(apneia\s+obstrutiva\s+do\s+sono|apneia\s+do\s+sono)\b", "obstructive sleep apnoea"),
     (r"\b(carcinoma\s+basocelular)\b", "basal cell carcinoma"),
+    (r"\b(c[aâ]ncer\s+de\s+mama|carcinoma\s+ductal)\b", "malignant neoplasm of breast"),
+    (r"\b(carcinoma\s+espinocelular|carcinoma\s+epidermoide)\b", "squamous cell carcinoma"),
+    (r"\b(l[uú]pus\s+eritematoso\s+sist[eê]mico|les)\b", "systemic lupus erythematosus"),
+    (r"\b(anemia\s+falciforme|crise\s+falciforme)\b", "sickle cell disease crisis"),
+    (r"\b(p[uú]rpura\s+trombocitop[eê]nica)\b", "immune thrombocytopenia purpura"),
+    (r"\b(hipotireoidismo|hipotiroidismo)\b", "primary hypothyroidism"),
+    (r"\b(insufici[eê]ncia\s+card[ií]aca)\b", "heart failure"),
+    (r"\b(acidente\s+vascular\s+cerebral|avc)\b", "stroke cerebrovascular accident"),
+    (r"\b(depress[aã]o|epis[oó]dio\s+depressivo)\b", "depressive episode depression"),
+    (r"\b(ansiedade\s+generalizada)\b", "generalized anxiety disorder"),
+    (r"\b(escabiose|sarna)\b", "scabies"),
 ]
 
 HINDI_CLINICAL_MAP = [
@@ -148,11 +197,16 @@ HINDI_CLINICAL_MAP = [
     (r"(डेंगू)", "dengue fever"),
     (r"(अस्थमा|दमा)", "bronchial asthma"),
     (r"(मोतियाबिंद)", "cataract"),
-    (r"(हाइपोथायरायडिज्म|थायराइड)", "hypothyroidism"),
+    (r"(हाइपोथायरायडिज्म|थायराइड)", "primary hypothyroidism"),
     (r"(बुखार)", "fever pyrexia"),
     (r"(खांसी)", "cough bronchitis"),
     (r"(दस्त|पेचिश)", "diarrhea dysentery"),
     (r"(पेट\s*दर्द)", "abdominal pain"),
+    (r"(डायबिटीज|मधुमेह)", "diabetes mellitus"),
+    (r"(उच्च\s*रक्तचाप|हाई\s*बीपी|ब्लड\s*प्रेशर)", "essential hypertension"),
+    (r"(अवसाद|डिप्रेशन)", "depressive disorder depression"),
+    (r"(चिंता\s*विकार|एंग्जाइटी)", "generalized anxiety disorder"),
+    (r"(स्तन\s*कैंसर)", "malignant neoplasm of breast"),
 ]
 
 ARABIC_CLINICAL_MAP = [
@@ -165,6 +219,13 @@ ARABIC_CLINICAL_MAP = [
     (r"(إسهال)", "diarrhea"),
     (r"(ربو)", "asthma"),
     (r"(سكري)", "diabetes mellitus"),
+    (r"(السل|تدرن)", "respiratory tuberculosis"),
+    (r"(التهاب\s*رئوي)", "acute pneumonia"),
+    (r"(ارتفاع\s*ضغط\s*الدم)", "essential hypertension"),
+    (r"(قصور\s*الغدة\s*الدرقية)", "primary hypothyroidism"),
+    (r"(سرطان\s*الثدي)", "malignant neoplasm of breast"),
+    (r"(اكتئاب)", "depressive disorder depression"),
+    (r"(قلق\s*عام)", "generalized anxiety disorder"),
 ]
 
 CHINESE_CLINICAL_MAP = [
@@ -176,9 +237,15 @@ CHINESE_CLINICAL_MAP = [
     (r"(气血两虚)", "dual deficiency of qi and blood traditional medicine"),
     (r"(发热|发烧)", "fever pyrexia"),
     (r"(哮喘)", "asthma"),
-    (r"(糖尿病)", "diabetes mellitus"),
+    (r"(2型糖尿病|糖尿病)", "type 2 diabetes mellitus"),
     (r"(白内障)", "cataract"),
     (r"(阑尾炎)", "appendicitis"),
+    (r"(高血压)", "essential hypertension"),
+    (r"(乳腺癌)", "malignant neoplasm of breast"),
+    (r"(甲状腺功能减退|甲减)", "primary hypothyroidism"),
+    (r"(系统性红斑狼疮)", "systemic lupus erythematosus"),
+    (r"(过敏性鼻炎)", "allergic rhinitis"),
+    (r"(焦虑症|焦虑障碍)", "generalized anxiety disorder"),
 ]
 
 
