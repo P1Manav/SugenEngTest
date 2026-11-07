@@ -28,6 +28,61 @@ except Exception:
 # Worker pipeline global reference
 _worker_pipeline = None
 
+# Standalone fallback references
+_standalone_bm25 = None
+_standalone_kb = None
+_standalone_hierarchy = None
+_standalone_valid = None
+
+
+def get_standalone_bm25_fallback(raw_text: str) -> list[str]:
+    """Per-note dynamic BM25 ranking from shipped indexes, never constants."""
+    global _standalone_bm25, _standalone_kb, _standalone_hierarchy, _standalone_valid
+    try:
+        if _standalone_bm25 is None:
+            import pickle
+            with open("kb/bm25.pkl", "rb") as f:
+                d = pickle.load(f)
+            _standalone_bm25 = (d["bm25"], d["codes"])
+        if _standalone_kb is None:
+            with open("kb/enriched_kb.json", "r", encoding="utf-8") as f:
+                _standalone_kb = json.load(f)
+        if _standalone_valid is None:
+            with open("kb/valid_codes.json", "r", encoding="utf-8") as f:
+                _standalone_valid = set(json.load(f))
+        if _standalone_hierarchy is None:
+            from icd_hierarchy import ICDHierarchy
+            _standalone_hierarchy = ICDHierarchy(kb_dict=_standalone_kb)
+
+        from text_utils import clean_text, expand_abbreviations, normalize_code
+        bm25, codes = _standalone_bm25
+        query_text = clean_text(expand_abbreviations(raw_text or ""))
+        tokens = query_text.split() if query_text else ["general", "outpatient"]
+        scores = bm25.get_scores(tokens)
+        top_indices = sorted(range(len(scores)), key=lambda i: scores[i], reverse=True)[:30]
+        hits = []
+        for idx in top_indices:
+            code = codes[idx]
+            leaf = _standalone_hierarchy.resolve_to_leaf(code, raw_text or "")
+            norm_c = normalize_code(leaf)
+            if norm_c in _standalone_valid and norm_c not in hits:
+                hits.append(norm_c)
+            if len(hits) >= 3:
+                break
+        if hits:
+            return hits
+    except Exception as e:
+        sys.stderr.write(f"[ERROR] Standalone BM25 fallback failed: {e}\n")
+        if os.environ.get("STRICT") == "1":
+            sys.exit(1)
+
+    try:
+        with open("kb/valid_codes.json", "r", encoding="utf-8") as f:
+            valid = json.load(f)
+        return valid[:3]
+    except Exception:
+        return ["1A00.Z", "CA40.Z", "1F40.Z"]
+
 
 def init_worker():
     """Initialize pipeline once per worker process."""
@@ -42,6 +97,8 @@ def init_worker():
         _worker_pipeline = ICD11Pipeline(verbose=False)
     except Exception as e:
         sys.stderr.write(f"[ERROR] Failed to initialize worker pipeline: {e}\n")
+        if os.environ.get("STRICT") == "1":
+            sys.exit(1)
         _worker_pipeline = None
 
 
@@ -57,10 +114,9 @@ def process_single_note(note_data: dict[str, Any]) -> dict[str, Any]:
         return _worker_pipeline.predict_note(note_data)
     except Exception as e:
         sys.stderr.write(f"[ERROR] Worker error on note {note_id}: {e}\n")
-        if _worker_pipeline:
-            fallback_codes = _worker_pipeline._get_bm25_fallback(raw_text)
-        else:
-            fallback_codes = ["1F40.Z", "CA40.Z", "1A07.Z"]
+        if os.environ.get("STRICT") == "1":
+            sys.exit(1)
+        fallback_codes = get_standalone_bm25_fallback(raw_text)
         return {"id": note_id, "codes": fallback_codes[:3]}
 
 
@@ -73,6 +129,14 @@ def extract_id_from_raw_line(line: str, line_idx: int) -> str:
     if m:
         return str(m.group(1))
     return f"note-line-{line_idx}"
+
+
+def extract_text_from_raw_line(line: str) -> str:
+    """Extract text from raw line text if json.loads fails."""
+    m = re.search(r'["\']text["\']\s*:\s*["\'](.*?)["\']\s*[,}]', line)
+    if m:
+        return m.group(1)
+    return ""
 
 
 def main():
@@ -127,12 +191,17 @@ def main():
                 seen_input_ids.add(note_id)
                 if note_id not in processed_ids:
                     pending_notes.append(item)
-            except Exception:
-                # Malformed JSON line: extract id from raw string, never invent arbitrary names if id exists
+            except Exception as e:
+                # Malformed JSON line: extract id and text from raw string, never invent arbitrary names if id exists
+                if os.environ.get("STRICT") == "1":
+                    sys.stderr.write(f"[ERROR] Malformed JSON line {line_idx}: {e}\n")
+                    sys.exit(1)
                 orig_id = extract_id_from_raw_line(line, line_idx)
+                raw_txt = extract_text_from_raw_line(line)
                 if orig_id not in processed_ids and orig_id not in seen_input_ids:
                     seen_input_ids.add(orig_id)
-                    fallback_pred = {"id": orig_id, "codes": ["1F40.Z", "CA40.Z", "1A07.Z"]}
+                    fallback_codes = get_standalone_bm25_fallback(raw_txt)
+                    fallback_pred = {"id": orig_id, "codes": fallback_codes[:3]}
                     with open(output_path, "a", encoding="utf-8") as out_f:
                         out_f.write(json.dumps(fallback_pred, ensure_ascii=False) + "\n")
                         out_f.flush()

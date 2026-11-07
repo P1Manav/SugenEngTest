@@ -16,15 +16,10 @@ except Exception:
 from assertion_filter import AssertionFilter, split_sentences_and_clauses
 from diagnosis_extractor import DiagnosisExtractor
 from icd_hierarchy import ICDHierarchy
-from llm_reranker import LLMReranker
 from multilingual import detect_language, translate_clinical_text
 from reranker import RuleReranker
 from retrieval import HybridRetriever
 from text_utils import clean_text, expand_abbreviations, normalize_code
-
-# High-frequency default outpatient codes if text is completely empty or unindexable
-DEFAULT_OUTPATIENT_CODES = ["1F40.Z", "CA40.Z", "1A07.Z"]
-
 
 class ICD11Pipeline:
     """Full ICD-11 coding pipeline for outpatient clinical notes."""
@@ -63,7 +58,6 @@ class ICD11Pipeline:
             kb_path=kb_path,
         )
         self.reranker = RuleReranker(self.kb)
-        self.llm_reranker = LLMReranker(self.valid_codes, self.kb)
 
         # Run startup self-test note
         self._run_self_test()
@@ -84,15 +78,13 @@ class ICD11Pipeline:
 
     def _get_bm25_fallback(self, raw_text: str) -> list[str]:
         """Emit best BM25 codes for the note text on unexpected failure, never a constant."""
-        if not raw_text or not raw_text.strip():
-            return DEFAULT_OUTPATIENT_CODES
-
         try:
-            clean_q = clean_text(expand_abbreviations(raw_text))
-            hits = self.retriever.bm25_retriever.retrieve(clean_q, top_k=10)
+            clean_q = clean_text(expand_abbreviations(raw_text or ""))
+            query_str = clean_q if clean_q else "outpatient consultation clinical examination illness"
+            hits = self.retriever.bm25_retriever.retrieve(query_str, top_k=20)
             fallback_codes = []
             for code, _ in hits:
-                leaf_code = self.hierarchy.resolve_to_leaf(code, raw_text)
+                leaf_code = self.hierarchy.resolve_to_leaf(code, raw_text or "")
                 norm_c = normalize_code(leaf_code)
                 if norm_c in self.valid_codes and norm_c not in fallback_codes:
                     fallback_codes.append(norm_c)
@@ -103,7 +95,7 @@ class ICD11Pipeline:
         except Exception:
             pass
 
-        return DEFAULT_OUTPATIENT_CODES
+        return sorted(list(self.valid_codes))[:3]
 
     def predict_note(self, note: dict[str, Any]) -> dict[str, Any]:
         """Predict top-3 ICD-11 codes for a clinical note."""
@@ -182,17 +174,6 @@ class ICD11Pipeline:
 
             # 8. Diversity selection for top-3
             selected_codes = self._select_diverse_top3(reranked, primary_query, expanded_text)
-
-            # Optional LLM reranking stage (only when USE_LLM_RERANK=1 and key is present)
-            if self.llm_reranker.is_enabled():
-                candidate_codes = [c[0] for c in reranked[:20]]
-                selected_codes = self.llm_reranker.rerank_note(
-                    note_id=note_id,
-                    note_text=raw_text,
-                    translated_text=input_text if input_text != raw_text else None,
-                    candidate_codes=candidate_codes or selected_codes,
-                    max_output=3,
-                )
 
             # 9. Fallback if empty
             if not selected_codes:

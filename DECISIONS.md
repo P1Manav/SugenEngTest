@@ -2,7 +2,7 @@
 
 ## Entry 1 — 2026-11-06 14:20 IST — Project scaffold and v0 architecture
 
-**Commit:** initial scaffold  
+**Commit:** `7b34984`  
 **Decision:** Start with BM25 + dense retrieval (all-MiniLM-L6-v2) + RRF fusion over MMS titles only, with rule-based diagnosis extraction and .Z fallback logic.
 
 **Options considered:**
@@ -18,7 +18,7 @@
 
 ## Entry 2 — 2026-11-06 14:35 IST — Strict Leaf Resolution and Parent-to-Child Qualifier Matching
 
-**Commit:** v0-hierarchy-rules  
+**Commit:** `7b34984`  
 **Decision:** All predictions must strictly resolve to valid MMS leaf codes (15,912 out of 18,375 categories). Non-leaf codes are never emitted. When descending from a non-leaf candidate to child codes, specificity matching is computed only against *child qualifier tokens* that do not exist in the parent title.
 
 **Options considered:**
@@ -34,7 +34,7 @@
 
 ## Entry 3 — 2026-11-06 14:40 IST — Assertion Filter Vaccination Protection & Chapter 21 Demotion
 
-**Commit:** v0-assertion-and-reranker  
+**Commit:** `7b34984`  
 **Decision:** Prevent assertion filter from negating confirmed diagnoses when notes contain negative vaccination history (e.g., "Not vaccinated vs mumps"), and demote Chapter 21 symptom/sign codes when definitive disease codes are matched.
 
 **Options considered:**
@@ -51,7 +51,7 @@
 
 ## Entry 4 — 2026-11-06 14:50 IST — Intra-Sentence Assertion Splitting & Confirmed Clause Isolation
 
-**Commit:** v1-assertion-clause-splitting  
+**Commit:** `b5814e7`  
 **Decision:** Split sentences on commas and semicolons when evaluating diagnostic assertions (`split_sentences_and_clauses`), ensuring that trailing negative clauses (e.g., `malaria excluded` or `mRDT NEG`) do not falsely negate the primary diagnosis in compound diagnostic sentences like `Dx viral URTI, malaria excluded`.
 
 **Options considered:**
@@ -66,7 +66,7 @@
 
 ## Entry 5 — 2026-11-06 15:00 IST — Clinical Abbreviation Expansion, .Y Demotion, and Complication Alignment
 
-**Commit:** v1-reranker-and-abbreviations  
+**Commit:** `b5814e7`  
 **Decision:** Expand high-frequency East African / outpatient clinical abbreviations (e.g. `thrush`, `vaginal thrush`, `dysentery`, `frozen shoulder`, `plantar fasciitis`, `GDM`, `CCF`) in `text_utils.py`, apply a penalty to `.Y` ("Other specified") codes relative to `.Z` ("Unspecified"), and add uncomplicated/complication clinical alignment bonuses in `RuleReranker`.
 
 **Options considered:**
@@ -82,7 +82,7 @@
 
 ## Entry 6 — 2026-11-06 15:10 IST — Specific Child Descent vs Blind .Z Promotion
 
-**Commit:** v1-specificity-descent-analysis  
+**Commit:** `b5814e7`  
 **Decision:** Specificity descent from a family to a specific child must be strictly evidence-based (requiring differential qualifier matches in the note text) rather than blind ranking promotion of specific siblings over `.Z`.
 
 **Options considered:**
@@ -97,7 +97,7 @@
 
 ## Entry 7 — 2026-11-06 15:20 IST — Deterministic Multilingual Clinical Normalization (Swahili, Spanish, French)
 
-**Commit:** v2-multilingual-clinical-normalization  
+**Commit:** `1436ff2`  
 **Decision:** Implement a 100% offline, zero-network multilingual normalization module (`multilingual.py`) using marker-word language identification and high-frequency clinical term translation for Swahili, Spanish, and French consultations.
 
 **Options considered:**
@@ -114,6 +114,7 @@
 
 ## Entry 8 — 2026-11-06 17:05 IST — Localized Evaluation Data, Official Grader, and Evaluation Runner
 
+**Commit:** `8a22ece`  
 **Task:** 1.1  
 **Decision:** Migrate `dev_notes.jsonl`, `predictions.example.jsonl`, and `score.py` directly into the repository root and `data/` directory, update all path references across `evaluate.py`, `build_kb.py`, and analysis scripts, and add `scripts/run_eval.sh`.
 
@@ -128,6 +129,7 @@
 
 ## Entry 9 — 2026-11-06 17:10 IST — Corrected Bootstrap Confidence Interval Bug & Synthetic Validation
 
+**Commit:** `ae5f710`  
 **Task:** 1.5  
 **Decision:** Correct the bootstrap confidence interval calculation in `evaluate.py`. The upper bound for `top1_ci` was inadvertently referencing `b_top3s` instead of `b_top1s`, artificially inflating the 55% Top-1 upper bound to 85.0%. Added unit test `tests/test_bootstrap_ci.py` validating percentile estimation on synthetic binomial cases.
 
@@ -142,6 +144,7 @@
 
 ## Entry 10 — 2026-11-06 17:15 IST — Real Offline Language ID with Unicode Script Gating
 
+**Commit:** `7910864`  
 **Task:** 1.6  
 **Decision:** Replace heuristic marker-word detection with real offline language identification combining instant Unicode script gating (Devanagari, Arabic, Japanese Kana, CJK, Cyrillic) and Lingua n-gram detection.
 
@@ -157,8 +160,9 @@
 
 ## Entry 11 — 2026-11-06 17:25 IST — Offline-Safe Build, Vendored Weights & Compressed NPZ Embeddings
 
+**Commit:** `da217f2`  
 **Task:** 1.2  
-**Decision:** Vendor all model weights locally (`models/all-MiniLM-L6-v2/model.safetensors`, `models/fasttext/lid.176.ftz`), compress dense embeddings to `kb/dense_embeddings.npz` (26 MB, 0.03s load time), pin all dependencies in `requirements.txt` (`torch==2.5.1`, `sentence-transformers==6.2.0`, `numpy==2.4.6`, `scikit-learn==1.9.1`, `lingua-language-detector==2.1.1`, `onnxruntime==1.31.1`, `openai==2.54.0`, `anthropic==2.6.0`), and remove redundant build-time network downloads from `Dockerfile`.
+**Decision:** Vendor all model weights locally (`models/all-MiniLM-L6-v2/model.safetensors`), compress dense embeddings to `kb/dense_embeddings.npz` (26 MB, 0.03s load time), pin all dependencies in `requirements.txt` (`torch==2.5.1`, `sentence-transformers==6.2.0`, `numpy==2.4.6`, `scikit-learn==1.9.1`, `lingua-language-detector==2.1.1`, `onnxruntime==1.31.1`), and remove redundant build-time network downloads from `Dockerfile`.
 
 **Options considered:**
 1. Download models from HuggingFace at build time — fails in offline or proxy-restricted environments and adds fragile external network dependencies.
@@ -171,6 +175,7 @@
 
 ## Entry 12 — 2026-11-06 17:30 IST — Runtime Hygiene, Startup Self-Test & Non-Silent Failure Recovery
 
+**Commit:** `da217f2`  
 **Task:** 1.3, 1.4  
 **Decision:** Eliminate silent `except Exception: return RA01` fallbacks. Added startup self-test note (`{"id": "__self_test__"}`), trace logging to `sys.stderr` with note IDs, fallback tracking counter, and BM25-based candidate recovery (`_get_bm25_fallback`) when unexpected errors occur. In `entrypoint.py`, added raw string ID recovery for corrupted JSON lines, input ID deduplication, thread pinning (`torch.set_num_threads(1)`), and `imap_unordered` pooling.
 
@@ -185,7 +190,7 @@
 
 ## Entry 13 — 2026-11-06 19:15 IST — Knowledge Base Enrichment via WHO API, Specificity Descent Refactor & Multilingual Coverage
 
-**Commit:** `04be00e`  
+**Commit:** `43f8573`  
 **Task:** 2.1, 2.2, 3.3, 3.6  
 **Decision:** Enriched the ICD-11 Knowledge Base (`kb/enriched_kb.json` and `kb/who_enrichments.json`) with official WHO ICD-11 entities via OAuth2 client credentials (`WHO_CLIENT_ID` / `WHO_CLIENT_SECRET`), extracting official index terms (synonyms), definitions, inclusions, and exclusions across all 18,375 MMS categories. Refactored `icd_hierarchy.py` specificity descent with child `.Z` priority and deep descendant synonym matching. Upgraded `reranker.py` with bracketed alias parsing and specificity bonuses. Added multi-language clinical dictionaries for Hindi, Arabic, Chinese, Swahili, Spanish, French, and Portuguese in `multilingual.py`.
 
@@ -198,38 +203,37 @@
 
 ---
 
-## Entry 14 — 2026-11-06 19:25 IST — Optional LLM Reranking Stage with Hard Budget Guard and Candidate Gating
+## Entry 14 — 2026-11-06 19:25 IST — Experimental LLM Reranking Stage (Removed in Audit)
 
-**Commit:** `bfe1e65`  
+**Commit:** `84886cb`  
 **Task:** 4.1, 4.2  
-**Decision:** Implemented optional LLM reranking stage (`llm_reranker.py`, integrated into `pipeline.py`) that activates strictly when `USE_LLM_RERANK=1` and `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` is present. Baseline pipeline remains 100% offline, zero-network, and zero-overhead when disabled. Candidate gating strictly limits model selection to top-20 baseline candidates, validated against `valid_codes.json`. Implemented cumulative token cost accounting with a hard $4.00 spend guard and a 15-second per-note timeout that falls back to baseline on any failure.
+**Decision:** Originally explored an optional LLM reranker with spend and timeout guards. In the strict NO-LLM audit, this was entirely removed from the codebase (deleted `llm_reranker.py`, tests, and dependencies) to guarantee zero network, zero LLM dependencies at build or run time.
 
 **Options considered:**
-1. Free-form generation of ICD-11 codes by LLM — high risk of hallucinated or non-leaf codes that score 0. Candidate gating guarantees 100% valid codes.
-2. Uncapped API calls — risks exceeding the $6.00 brief budget. Implemented a $4.00 hard budget limit that automatically shuts off the stage if exceeded.
-3. Crashing on API failure — violates the >90% prediction requirement. Any API error or timeout automatically degrades gracefully to baseline candidates.
+1. Maintain hybrid LLM capability — violates strict no-LLM constraint.
+2. Complete removal of all LLM code, tests, and dependencies — 100% compliant with zero-LLM brief.
 
-**What decided it:** Satisfies P2 requirement 4. Verified by unit tests in `tests/test_llm_reranker.py` covering candidate gating, spend guard shutoff, disabled baseline mode, and error fallback.
+**What decided it:** Full removal during audit.
 
 ---
 
-## Entry 15 — 2026-11-06 19:30 IST — Held-Out Evaluation Suite Across All 26 Chapters and 8 Languages
+## Entry 15 — 2026-11-06 19:30 IST — Held-Out Evaluation Dataset (Self-Written Smoke Set)
 
-**Commit:** `fce6d82`  
+**Commit:** `5f6c613`  
 **Task:** 5.1  
-**Decision:** Created a comprehensive 85-note held-out evaluation dataset (`data/held_out_notes.jsonl` and generator `scripts/create_held_out_notes.py`) designed to stress-test generalization beyond dev. The suite spans all 26 ICD-11 MMS chapters and 8 languages (English, Swahili, French, Spanish, Hindi, Arabic, Chinese, Portuguese). All gold targets are strictly certified valid leaf categories against `data/mms-2026-01.json`, incorporating clinical traps (negated differentials, comorbidities, previous misdiagnoses).
+**Decision:** Created an 85-note synthetic evaluation dataset (`data/held_out_notes.jsonl` and generator `scripts/create_held_out_notes.py`) spanning 26 ICD-11 MMS chapters and 8 languages. **Note:** This is a self-written smoke set (optimistic, terminology aligns with glossary); it serves as a sanity check against crashes and chapter coverage, but is NOT evidence of generalization to unseen real-world clinical notes.
 
 **Options considered:**
-1. Randomly splitting the 60-note dev set — leaves chapters 02, 06, 07, 08, 09, 10, 17, 19, 20, 23, 25, 26 unrepresented and restricts testing to English/Swahili.
-2. Generating notes with synthetic non-existent codes — invalidates exact-match grading. All codes are verified against MMS category leaves.
+1. Present held-out score as generalization proof — misleading because vocabulary overlaps with handcrafted translation dictionaries.
+2. Label transparently as a self-written smoke test — honest benchmarking standard.
 
-**What decided it:** Satisfies P3 requirement 5.1. Measured baseline offline performance: Top-1: 32.94%, Top-3: 56.47%, Score: 30.59 / 75.0 (40.78 / 100), with 0 missing predictions and 0 invalid codes.
+**What decided it:** Transparent documentation in README and DECISIONS.md.
 
 ---
 
 ## Entry 16 — 2026-11-06 19:35 IST — 100% Complete WHO ICD-11 Release Enrichment Vendored
 
-**Commit:** `1ac8268`  
+**Commit:** `9cd8e68`  
 **Task:** 2.1, 2.2  
 **Decision:** Fully completed asynchronous WHO API release enrichment for all 18,375 categories in `data/mms-2026-01.json`, yielding 93,387 official WHO index terms, definitions, inclusions, and exclusions. Rebuilt `kb/enriched_kb.json` (23.5 MB) and `kb/bm25.pkl` (5.68 MB), and vendored `kb/who_enrichments.json` (9.08 MB) directly into the repository. This provides 100% offline self-containment with zero runtime or build-time WHO API dependency.
 
@@ -241,13 +245,17 @@
 
 ---
 
-## Entry 17 — 2026-11-06 19:40 IST — Final Documentation, Architecture Diagram, Provenance & Verification
+## Entry 17 — 2026-11-06 19:40 IST — Architecture Documentation, Provenance & Verification
 
-**Commit:** `1835662`  
+**Commit:** `f902a8f`  
 **Task:** 6.3, 6.4  
-**Decision:** Updated `README.md` with full architecture Mermaid flowcharts, exact dev (53.3% Top-1, 71.7% Top-3, 44.58 / 75.0) and held-out (32.9% Top-1, 56.5% Top-3, 30.59 / 75.0) performance tables with 95% bootstrap confidence intervals, data provenance and license attribution (WHO ICD-11 MMS, CC BY-NC-ND 3.0 IGO), concrete AI tooling failure analysis, and execution runbooks for Docker and native environments.
+**Decision:** Documented architecture and evaluation in `docs/ARCHITECTURE.md` and initial README, noting verified dev metrics, CC BY-NC-ND 3.0 IGO data license attribution, and reproduction instructions.
 
 **Options considered:**
+1. Bloated multi-page README — obscures critical evaluation and setup instructions.
+2. Concise one-page README with detailed architectural deep-dive in `docs/ARCHITECTURE.md`.
+
+**What decided it:** Split detailed diagrams and module breakdown to `docs/ARCHITECTURE.md`.
 1. Generic architecture summary — leaves ambiguous how the optional LLM stage interacts with the offline baseline.
 2. Complete end-to-end documentation — provides exact reproduction commands, verified metrics, and explicit rejection risk defenses.
 

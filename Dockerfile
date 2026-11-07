@@ -29,7 +29,6 @@ COPY diagnosis_extractor.py .
 COPY icd_hierarchy.py .
 COPY retrieval.py .
 COPY reranker.py .
-COPY llm_reranker.py .
 COPY multilingual.py .
 COPY pipeline.py .
 COPY build_kb.py .

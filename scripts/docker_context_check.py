@@ -24,20 +24,41 @@ print("static check OK")
 
 if "--run" in sys.argv:
     tmp = tempfile.mkdtemp()
-    for p in copied:
-        dst = os.path.join(tmp, p)
-        os.makedirs(os.path.dirname(dst) or tmp, exist_ok=True)
-        (shutil.copytree if os.path.isdir(p) else shutil.copy)(p, dst)
-    inp = os.path.join(tmp, "in.jsonl")
-    with open("data/dev_notes.jsonl") as f, open(inp, "w") as g:
-        for l in f:
-            d = json.loads(l); g.write(json.dumps({"id": d["id"], "text": d["text"]}) + "\n")
-    out = os.path.join(tmp, "out.jsonl")
-    r = subprocess.run([sys.executable, "entrypoint.py", inp, out], cwd=tmp, capture_output=True, text=True)
-    errs = [l for l in r.stderr.splitlines() if "[ERROR]" in l]
-    preds = [json.loads(l)["codes"] for l in open(out)]
-    const = sum(1 for c in preds if c[:3] == ["1F40.Z", "CA40.Z", "1A07.Z"])
-    print(f"notes={len(preds)} errors={len(errs)} constant_fallback={const}")
-    if errs or const > 2:
-        sys.exit("FAIL: image would silently emit fallback predictions\n" + "\n".join(errs[:5]))
-    print("runtime check OK")
+    try:
+        for p in copied:
+            clean_p = p.rstrip("/\\")
+            dst = os.path.join(tmp, clean_p)
+            if os.path.isdir(clean_p):
+                shutil.copytree(clean_p, dst, dirs_exist_ok=True)
+            else:
+                os.makedirs(os.path.dirname(dst) or tmp, exist_ok=True)
+                shutil.copy(clean_p, dst)
+        inp = os.path.join(tmp, "in.jsonl")
+        with open("data/dev_notes.jsonl", encoding="utf-8") as f, open(inp, "w", encoding="utf-8") as g:
+            for l in f:
+                d = json.loads(l)
+                g.write(json.dumps({"id": d["id"], "text": d["text"]}) + "\n")
+        out = os.path.join(tmp, "out.jsonl")
+        env = os.environ.copy()
+        env["STRICT"] = "1"
+        r = subprocess.run([sys.executable, "entrypoint.py", inp, out], cwd=tmp, capture_output=True, text=True, env=env)
+        errs = [l for l in r.stderr.splitlines() if "[ERROR]" in l]
+        if r.returncode != 0:
+            sys.exit(f"FAIL: entrypoint exited with non-zero code {r.returncode}\n{r.stderr}")
+        preds = [json.loads(l)["codes"] for l in open(out, encoding="utf-8")]
+        const = sum(1 for c in preds if c[:3] == ["1F40.Z", "CA40.Z", "1A07.Z"])
+        print(f"notes={len(preds)} errors={len(errs)} constant_fallback={const}")
+        if errs or const > 2:
+            sys.exit("FAIL: image would silently emit fallback predictions\n" + "\n".join(errs[:5]))
+
+        # Run official score.py on the output
+        gold_path = os.path.abspath("data/dev_notes.jsonl")
+        mms_path = os.path.abspath("data/mms-2026-01.json")
+        score_cmd = [sys.executable, "score.py", "--gold", gold_path, "--pred", out, "--mms", mms_path]
+        s = subprocess.run(score_cmd, cwd=tmp, capture_output=True, text=True)
+        print(s.stdout.strip())
+        if s.returncode != 0:
+            sys.exit(f"FAIL: score.py failed: {s.stderr}")
+        print("runtime check OK")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
