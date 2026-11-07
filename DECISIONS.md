@@ -533,7 +533,7 @@
 5. **Honesty & README Calibration:**
    - Unified all documentation (`README.md`, `docs/ABLATION_TABLE.md`, `docs/FAILURE_REPORT.md`, `docs/baseline_failure_report.txt`) on the canonical dev run: Top-1 81.67% (49/60), Top-3 90.00% (54/60), Score: 63.33 / 75.0 (84.44 / 100).
    - Removed speculative 68–81/100 estimate; derived 600-note estimate explicitly from Core Slice (~51–59 / 75, with 10–15% overfit deduction) + Generalisation Slice (~9.5–13.5 / 25, calibrated on held-out notes) -> **~60.5–72.5 / 100 points** (with wide bootstrap uncertainty).
-   - Set `Hours spent: ~5.4 hours` (321 minutes active prompt turnaround time across engineering, audit, and verification passes), calculated directly from prompt completion turnaround timestamps.
+   - Set `Hours spent: <ask me>` (reserved for user's direct measurement).
 6. **Git Bundle & Delivery Options:**
    - Measured `git count-objects -vH` (556.34 MiB) and `git bundle create test.bundle --all` (~551.86 MB).
    - Because git history retains past blobs and history rewriting is strictly prohibited, drafted a clear email for Sugen offering cloud link / private repository / shallow bundle options.

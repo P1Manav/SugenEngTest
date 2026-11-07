@@ -23,9 +23,9 @@ Evaluated using the exact match grader (`score.py`) against valid leaf categorie
 
 ### Estimated Hidden Score (600 Unseen Notes, 100 Points Total)
 - **Honest Estimation Methodology:** The 60 dev notes were inspected during development to understand outpatient record styles and calibrate concept rules, creating inherent sample selection optimism. With n=60, bootstrap sampling variance is substantial (95% CI spanning 14.2 points on dev).
-- **Core Slice (450 notes, 75 pts max, 50*top1 + 25*top3):** Calibrated from dev performance (63.33 / 75.0) with an evidence-based 10–15% overfit/domain-shift allowance. Expected Top-1 ~65–75%, Top-3 ~75–85% -> projected yield is **~51–59 / 75 points** (95% CI interval: [46.0, 63.0]).
-- **Generalisation Slice (150 notes, 25 pts max, 16.7*top1 + 8.3*top3):** Calibrated from the 85-note held-out multi-chapter, multilingual evaluation set (measured Top-1: 41.2%, Top-3: 57.6%, Score: 35.0 / 75.0, a 46.7% point yield). Scaling 46.7% onto the 25-point scale yields **~11.7 points**, with an empirical uncertainty range of **~9.5–13.5 / 25 points**.
-- **Net Projected Hidden Range:** Derived explicitly as Core + Generalisation: **~60.5–72.5 / 100 points** (wide bootstrap uncertainty interval: [55.5, 76.5]).
+- **Core Slice (450 notes, 75 pts max, 50*top1 + 25*top3):** Dev scored 63.33 / 75.0. Accounting for an honest 15–25% generalization discount on unseen clinics (projected Top-1 ~60–70%, Top-3 ~70–80%) projects **~46–55 / 75 points**.
+- **Generalisation Slice (150 notes, 25 pts max, 16.7*top1 + 8.3*top3):** Calibrated from the held-out set (scored 34.71 / 75.0, a 46.3% yield). Because that set was self-written and is optimistic, true unseen multi-chapter/non-English notes are expected to yield ~35–45% of points, or **~9–11 / 25 points**.
+- **Realistic Projected Hidden Range:** Summing both slices gives **~55–66 / 100 points** as the realistic expectation (wide bootstrap uncertainty interval: [50.0, 70.0]). Do not treat the dev score (84.4/100 normalized) as the expectation on unseen data.
 
 ---
 
@@ -44,7 +44,7 @@ Evaluated using the exact match grader (`score.py`) against valid leaf categorie
 | `kb/who_enrichments.json` | WHO ICD-API v2 (`https://id.who.int/icd/release/11/2024-01/mms`) | CC BY-NC-ND 3.0 IGO | 93,387 official WHO index terms, definitions, inclusions, exclusions |
 | `kb/enriched_kb.json` | Derived knowledge base combining MMS structure & WHO enrichments | CC BY-NC-ND 3.0 IGO | Unified offline knowledge graph with parent-child links |
 | `kb/dense_embeddings.npz` | Pre-computed embeddings from `paraphrase-multilingual-MiniLM-L12-v2` | Apache 2.0 | 25 MB compressed float32 matrix for offline semantic lookup across 50+ languages |
-| `models/paraphrase-multilingual-MiniLM-L12-v2` | Hugging Face / Sentence-Transformers | Apache 2.0 | 117M parameter multilingual sentence encoder downloaded at docker build time at pinned revision `e8f8c21` and verified via SHA-256 (`7f4f89d...`) |
+| `models/paraphrase-multilingual-MiniLM-L12-v2` | Hugging Face / Sentence-Transformers | Apache 2.0 | 117M parameter multilingual sentence encoder downloaded at docker build time at pinned revision `e8f8c21` and verified via SHA-256 (`eaa086f...`) |
 
 ---
 
@@ -72,4 +72,4 @@ python score.py --gold data/dev_notes.jsonl --pred out/predictions.jsonl --mms d
 
 ---
 
-Hours spent: ~5.4 hours (321 minutes active prompt execution across engineering, audit, and verification passes)
+Hours spent: <ask me>

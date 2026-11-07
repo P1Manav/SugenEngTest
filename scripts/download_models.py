@@ -8,7 +8,7 @@ from huggingface_hub import snapshot_download
 
 PINNED_MODEL_ID = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 PINNED_REVISION = "e8f8c211226b894fcb81acc59f3b34ba3efd5f42"
-EXPECTED_SAFETENSORS_SHA256 = "7f4f89d628f87ade0e0b57c40affb6402cd77abc8110584d8d35dc86da514ee8"
+EXPECTED_SAFETENSORS_SHA256 = "eaa086f0ffee582aeb45b36e34cdd1fe2d6de2bef61f8a559a1bbc9bd955917b"
 DEFAULT_TARGET_DIR = "models/paraphrase-multilingual-MiniLM-L12-v2"
 
 
@@ -25,6 +25,21 @@ def download_and_verify(
         repo_id=repo_id,
         revision=revision,
         local_dir=target_dir,
+        allow_patterns=[
+            "config.json",
+            "config_sentence_transformers.json",
+            "model.safetensors",
+            "modules.json",
+            "sentence_bert_config.json",
+            "sentencepiece.bpe.model",
+            "special_tokens_map.json",
+            "tokenizer.json",
+            "tokenizer_config.json",
+            "unigram.json",
+            "1_Pooling/*",
+            "2_Normalize/*",
+            "README.md",
+        ],
     )
 
     safetensors_path = os.path.join(target_dir, "model.safetensors")
