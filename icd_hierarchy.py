@@ -214,6 +214,58 @@ class ICDHierarchy:
             if "without complication" in ch_info.get("title", "").lower():
                 if any(phrase in text_lower for phrase in ["no complication", "no complications", "uncomplicated", "without complication"]):
                     score += 15
+                elif ch == "1D80.0" and not any(comp in text_lower for comp in ["orchitis", "meningitis", "pancreatitis", "encephalitis"]):
+                    score += 12
+
+            # 3. Clinical decision rules for high-frequency outpatient branches
+            parent_code = ch_info.get("parent")
+            if parent_code == "BA00":
+                # Blood pressure parsing for essential hypertension subtypes
+                if ch == "BA00.0" and re.search(r"\b(1[4-9]\d|[2-9]\d\d)\s*/\s*(9\d|1\d\d)\b", text_lower):
+                    score += 18
+                elif ch == "BA00.2" and re.search(r"\b(1[4-9]\d|[2-9]\d\d)\s*/\s*([6-8]\d)\b", text_lower):
+                    score += 18
+                elif ch == "BA00.1" and re.search(r"\b(1[0-3]\d)\s*/\s*(9\d|1\d\d)\b", text_lower):
+                    score += 18
+            elif parent_code == "4A84":
+                # Anaphylaxis triggers
+                if ch == "4A84.0" and any(food_w in text_lower for food_w in ["peanut", "groundnut", "food", "biscuit", "milk", "egg", "fish", "wheat"]):
+                    score += 18
+            elif parent_code == "EK00":
+                # Contact dermatitis due to metals/nickel
+                if ch == "EK00.6" and any(m_w in text_lower for m_w in ["nickel", "metal", "stud", "earring", "buckle", "jewellery"]):
+                    score += 18
+            elif parent_code == "BA40":
+                # Stable vs unstable angina
+                if ch == "BA40.1" and any(st_w in text_lower for st_w in ["stable", "exertion", "exertional", "walking", "climbing", "relieved by rest"]):
+                    score += 18
+            elif parent_code == "5A40":
+                # Impaired fasting glucose vs prediabetes
+                if ch == "5A40.0" and any(fg_w in text_lower for fg_w in ["fasting", "fbs", "ifg", "impaired fasting"]):
+                    score += 18
+            elif parent_code == "5B81":
+                # Obesity in adults
+                if ch == "5B81.0" and ("bmi" in text_lower or not any(ped in text_lower for ped in ["child", "infant", "paed", "pediatric"])):
+                    score += 18
+            elif parent_code == "5B81.0":
+                if ch == "5B81.01" and not any(ped in text_lower for ped in ["child", "infant", "paed", "pediatric"]):
+                    score += 18
+            elif parent_code == "CA22":
+                # COPD with acute exacerbation
+                if ch == "CA22.0" and any(ex_w in text_lower for ex_w in ["exacerbation", "increased breathlessness", "increased sputum"]):
+                    score += 18
+            elif parent_code == "QA42":
+                # Normal first pregnancy
+                if ch == "QA42.0" and any(fp_w in text_lower for fp_w in ["first pregnancy", "g1p0", "g1", "primigravida"]):
+                    score += 18
+            elif parent_code == "5A00":
+                # Acquired hypothyroidism in adults
+                if ch == "5A00.2" and not any(cong in text_lower for cong in ["congenital", "infant", "child"]):
+                    score += 18
+            elif parent_code == "FA0":
+                # Osteoarthritis of knee
+                if ch == "FA01" and any(kn in text_lower for kn in ["knee", "knees"]):
+                    score += 18
 
             # 2. Distinguishing qualifier tokens between child and parent
             title = ch_info.get("title", "").lower()

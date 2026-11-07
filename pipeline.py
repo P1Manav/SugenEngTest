@@ -181,7 +181,7 @@ class ICD11Pipeline:
 
             # 5. Expand candidates via ICD hierarchy (.Z siblings, children, parent)
             if self.use_specificity_descent:
-                expanded_candidates = self.hierarchy.expand_candidates(filtered_candidates, max_expansions=50)
+                expanded_candidates = self.hierarchy.expand_candidates(filtered_candidates, max_expansions=120)
             else:
                 expanded_candidates = filtered_candidates
 
@@ -196,6 +196,12 @@ class ICD11Pipeline:
                     leaf_code = self.hierarchy.get_z_code(code) or code
                 norm_c = normalize_code(leaf_code)
                 if norm_c and norm_c in self.valid_codes and norm_c not in seen_codes:
+                    if self.use_assertion_filter:
+                        info = self.kb.get(norm_c)
+                        if info:
+                            title = info.get("title", "")
+                            if self.assertion_filter.is_candidate_negated_in_note(title, expanded_text, affirmed_phrases=extracted_phrases):
+                                continue
                     seen_codes.add(norm_c)
                     resolved_candidates.append((norm_c, score))
 

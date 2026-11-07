@@ -37,13 +37,15 @@ SPANISH_MARKERS = {
 FRENCH_MARKERS = {
     "patient", "patiente", "douleur", "fievre", "aigu", "chronique", "cephalee", "ans",
     "presente", "depuis", "jours", "semaines", "mois", "traitement", "examen", "tension",
-    "arterielle", "frequence", "cardiaque", "auscultation", "abdomen", "homme", "avec"
+    "arterielle", "frequence", "cardiaque", "auscultation", "abdomen", "homme", "avec",
+    "pour", "sur", "dans", "par", "une", "des", "les", "consulte", "prurit", "signe"
 }
 
 PORTUGUESE_MARKERS = {
     "paciente", "dor", "febre", "aguda", "cronica", "cefaleia", "anos", "apresenta",
     "queixa", "ha", "dias", "semanas", "meses", "tratamento", "exame", "pressao",
-    "arterial", "frequencia", "cardiaca", "ausculta", "abdomen", "mulher", "com"
+    "arterial", "frequencia", "cardiaca", "ausculta", "abdomen", "mulher", "com",
+    "para", "intensa", "sexo", "masculino", "feminino", "uma", "dos", "das"
 }
 
 # Clinical translations dictionary mapping (lang -> (pattern, english_term))

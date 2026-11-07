@@ -120,10 +120,11 @@ RE_MISDIAG = re.compile(r"|".join(MISDIAGNOSIS_TRIGGERS), re.IGNORECASE)
 CONJUNCTIONS = re.compile(r"\b(but|however|although|except|whereas|save\s+for|presented\s+with|imp:|impression:|a:|assessment:|dx:|diagnosis:)\b", re.IGNORECASE)
 
 
-def split_sentences_and_clauses(text: str) -> List[str]:
-    """Split text into sentences and short clause fragments based on punctuation."""
-    # Split by periods, commas, semicolons, colons, newlines, tabs
-    clauses = re.split(r"[\n\r;.]+|,\s*", text)
+def split_sentences_and_clauses(text: str) -> list[str]:
+    """Split text into sentences, short clause fragments, parentheticals, and question-mark queries."""
+    # Split by periods, semicolons, colons, newlines, tabs, commas, parentheses, and question marks
+    # Parentheticals like "(no alarm features)" and queries like "?Fe def" should be separate subclauses
+    clauses = re.split(r"[\n\r;.]+|,\s*|\s*[\(\)]\s*|\s*\?\s*", text)
     cleaned = []
     for c in clauses:
         c = c.strip()
