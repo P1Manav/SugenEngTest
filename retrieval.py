@@ -3,6 +3,7 @@ Operates completely offline with precomputed indexes and local sentence-transfor
 Includes robust fallback: if neural parts fail to load, gracefully degrades to BM25-only.
 """
 
+import hashlib
 import json
 import os
 import pickle
@@ -60,25 +61,14 @@ class BM25Retriever:
         return results
 
 
-def ensure_safetensors(model_dir: str):
-    """Recombine split safetensors parts if model.safetensors is not present."""
-    if not os.path.isdir(model_dir):
-        return
-    sf_path = os.path.join(model_dir, "model.safetensors")
-    if not os.path.exists(sf_path):
-        parts = sorted([p for p in os.listdir(model_dir) if p.startswith("model.safetensors.part")])
-        if parts:
-            import shutil
-            with open(sf_path, "wb") as out_f:
-                for part in parts:
-                    with open(os.path.join(model_dir, part), "rb") as in_f:
-                        shutil.copyfileobj(in_f, out_f)
-
+PINNED_MODEL_ID = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+PINNED_REVISION = "e8f8c211226b894fcb81acc59f3b34ba3efd5f42"
+EXPECTED_DIM = 384
 
 DEFAULT_DENSE_MODEL = (
     "models/paraphrase-multilingual-MiniLM-L12-v2"
     if os.path.exists("models/paraphrase-multilingual-MiniLM-L12-v2")
-    else "models/all-MiniLM-L6-v2"
+    else PINNED_MODEL_ID
 )
 
 
@@ -91,7 +81,6 @@ class DenseRetriever:
         codes_path: str = "kb/dense_codes.json",
         model_name_or_path: str = DEFAULT_DENSE_MODEL,
     ):
-        # Support both .npz and .npy
         if not os.path.exists(embeddings_path):
             npy_path = embeddings_path.replace(".npz", ".npy")
             if os.path.exists(npy_path):
@@ -103,23 +92,47 @@ class DenseRetriever:
                 else:
                     raise FileNotFoundError(f"Dense embeddings not found at {embeddings_path}")
 
-        if embeddings_path.endswith(".npz"):
-            self.embeddings = np.load(embeddings_path)["embeddings"]
-        else:
-            self.embeddings = np.load(embeddings_path)
+        if not os.path.exists(codes_path):
+            raise FileNotFoundError(f"Dense codes mapping not found at {codes_path}")
 
         with open(codes_path, "r", encoding="utf-8") as f:
             self.codes = json.load(f)
 
+        expected_checksum = hashlib.sha256("".join(self.codes).encode("utf-8")).hexdigest()
+
+        if embeddings_path.endswith(".npz"):
+            npz = np.load(embeddings_path)
+            self.embeddings = npz["embeddings"]
+
+            # Consistency guard checks
+            meta_model_id = str(npz["model_id"]) if "model_id" in npz else None
+            meta_dim = int(npz["embedding_dim"]) if "embedding_dim" in npz else None
+            meta_checksum = str(npz["codes_checksum"]) if "codes_checksum" in npz else None
+
+            errors = []
+            if meta_model_id is None or meta_model_id != PINNED_MODEL_ID:
+                errors.append(f"Model ID mismatch: expected {PINNED_MODEL_ID}, got {meta_model_id}")
+            if meta_dim is None or meta_dim != EXPECTED_DIM or self.embeddings.shape[1] != EXPECTED_DIM:
+                errors.append(f"Dimension mismatch: expected {EXPECTED_DIM}, got meta={meta_dim}, shape={self.embeddings.shape[1]}")
+            if meta_checksum is None or meta_checksum != expected_checksum:
+                errors.append(f"Codes checksum mismatch: expected {expected_checksum}, got {meta_checksum}")
+
+            if errors:
+                err_msg = "Embedding consistency guard failed: " + "; ".join(errors)
+                if os.environ.get("STRICT") == "1":
+                    raise RuntimeError(err_msg)
+                else:
+                    sys.stderr.write(f"[WARN] {err_msg}. Refusing dense embeddings and degrading to BM25.\n")
+                    raise ValueError(err_msg)
+        else:
+            if os.environ.get("STRICT") == "1":
+                raise RuntimeError(f"Dense embeddings must be an .npz file with consistency metadata: {embeddings_path}")
+            sys.stderr.write(f"[WARN] Dense embeddings at {embeddings_path} lacks metadata. Refusing dense.\n")
+            raise ValueError("Missing .npz metadata")
+
         from sentence_transformers import SentenceTransformer
-        if os.path.isdir(model_name_or_path):
-            ensure_safetensors(model_name_or_path)
-        elif not os.path.exists(model_name_or_path):
-            model_name_or_path = "models/all-MiniLM-L6-v2"
-            if os.path.isdir(model_name_or_path):
-                ensure_safetensors(model_name_or_path)
-            elif not os.path.exists(model_name_or_path):
-                model_name_or_path = "sentence-transformers/all-MiniLM-L6-v2"
+        if not os.path.exists(model_name_or_path):
+            model_name_or_path = PINNED_MODEL_ID
         self.model = SentenceTransformer(model_name_or_path)
 
     def retrieve(self, query: str, top_k: int = 50) -> list[tuple[str, float]]:
@@ -188,17 +201,20 @@ class HybridRetriever:
             self.dense_retriever = DenseRetriever(dense_embeddings_path, dense_codes_path, model_path)
             self.dense_available = True
         except Exception as e:
+            if os.environ.get("STRICT") == "1":
+                raise
             sys.stderr.write(f"[WARN] Neural dense retriever failed to initialize: {e}. Degraded to BM25-only.\n")
 
     def retrieve(
         self,
         primary_query: str,
         fallback_query: str = "",
+        raw_query: str = "",
         top_k: int = 50,
         use_bm25: bool = True,
         use_dense: bool = True,
     ) -> list[tuple[str, float]]:
-        """Retrieve candidates by querying BM25 and dense with primary and fallback queries."""
+        """Retrieve candidates by querying BM25 and dense with primary, fallback, and raw multilingual queries."""
         ranked_lists = []
         weights = []
 
@@ -217,7 +233,17 @@ class HybridRetriever:
                 except Exception as e:
                     sys.stderr.write(f"[WARN] Dense retrieval error on primary query: {e}\n")
 
-        # 2. Fallback query
+        # 2. Raw multilingual query (native language embedded by multilingual sentence transformer)
+        if raw_query and raw_query.strip() and raw_query != primary_query:
+            if use_dense and self.dense_available and self.dense_retriever:
+                try:
+                    dense_raw = self.dense_retriever.retrieve(raw_query, top_k=top_k)
+                    ranked_lists.append(dense_raw)
+                    weights.append(1.2)
+                except Exception as e:
+                    sys.stderr.write(f"[WARN] Dense retrieval error on raw query: {e}\n")
+
+        # 3. Fallback query
         if fallback_query and fallback_query.strip() and fallback_query != primary_query:
             if use_bm25:
                 bm25_fb = self.bm25_retriever.retrieve(fallback_query, top_k=top_k)

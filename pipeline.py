@@ -127,6 +127,10 @@ class ICD11Pipeline:
             # Detect language and translate clinical terms if non-English
             lang = detect_language(raw_text)
             input_text = translate_clinical_text(raw_text, lang) if lang != "en" else raw_text
+            raw_query = ""
+            if lang != "en":
+                raw_extracted = self.extractor.extract_diagnoses(raw_text, style=style)
+                raw_query = raw_extracted.get("primary_query", "") or raw_text[:300]
 
             # 1. Expand abbreviations & extract diagnostic phrases
             if self.use_abbreviations:
@@ -159,6 +163,7 @@ class ICD11Pipeline:
             raw_candidates = self.retriever.retrieve(
                 primary_query=primary_query,
                 fallback_query=filtered_note_text,
+                raw_query=raw_query,
                 top_k=40,
                 use_bm25=self.use_bm25,
                 use_dense=self.use_dense,

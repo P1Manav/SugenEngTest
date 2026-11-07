@@ -43,8 +43,10 @@ COPY tests/ tests/
 # Copy MMS source data and dev data
 COPY data/ data/
 
-# Copy prebuilt artifacts and vendored model weights (no external downloads at build or run time)
-COPY models/ models/
+# Download and verify pinned model weights at build time (run time is 100% offline)
+RUN python scripts/download_models.py
+
+# Copy prebuilt knowledge base artifacts
 COPY kb/ kb/
 
 ENTRYPOINT ["python", "entrypoint.py"]

@@ -40,6 +40,8 @@ if "--run" in sys.argv:
             else:
                 os.makedirs(os.path.dirname(dst) or tmp, exist_ok=True)
                 shutil.copy(clean_p, dst)
+        if os.path.isdir("models") and not os.path.exists(os.path.join(tmp, "models")):
+            shutil.copytree("models", os.path.join(tmp, "models"), dirs_exist_ok=True)
         inp = os.path.join(tmp, "in.jsonl")
         with open("data/dev_notes.jsonl", encoding="utf-8") as f, open(inp, "w", encoding="utf-8") as g:
             for raw_line in f:

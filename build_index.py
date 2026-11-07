@@ -6,6 +6,7 @@ Creates:
 - kb/dense_codes.json: List of codes corresponding to embedding rows
 """
 
+import hashlib
 import json
 import os
 import pickle
@@ -17,20 +18,9 @@ from sentence_transformers import SentenceTransformer
 
 from text_utils import clean_text, expand_abbreviations, tokenize
 
-
-def ensure_safetensors(model_dir: str):
-    """Recombine split safetensors parts if model.safetensors is not present."""
-    if not os.path.isdir(model_dir):
-        return
-    sf_path = os.path.join(model_dir, "model.safetensors")
-    if not os.path.exists(sf_path):
-        parts = sorted([p for p in os.listdir(model_dir) if p.startswith("model.safetensors.part")])
-        if parts:
-            import shutil
-            with open(sf_path, "wb") as out_f:
-                for part in parts:
-                    with open(os.path.join(model_dir, part), "rb") as in_f:
-                        shutil.copyfileobj(in_f, out_f)
+PINNED_MODEL_ID = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+PINNED_REVISION = "e8f8c211226b894fcb81acc59f3b34ba3efd5f42"
+EXPECTED_DIM = 384
 
 
 def build_indexes(
@@ -85,10 +75,8 @@ def build_indexes(
 
     if rebuild_dense or not (os.path.exists(dense_emb_path) and os.path.exists(dense_codes_path)):
         print(f"Loading dense model from {model_name_or_path}...")
-        if os.path.isdir(model_name_or_path):
-            ensure_safetensors(model_name_or_path)
-        elif not os.path.exists(model_name_or_path):
-            model_name_or_path = "sentence-transformers/all-MiniLM-L6-v2"
+        if not os.path.exists(model_name_or_path):
+            model_name_or_path = PINNED_MODEL_ID
         model = SentenceTransformer(model_name_or_path)
 
         print(f"Encoding {len(corpus_texts)} categories in batches...")
@@ -100,8 +88,16 @@ def build_indexes(
             convert_to_numpy=True,
         ).astype(np.float32)
 
-        print(f"Saving compressed dense embeddings ({embeddings.shape}) to {dense_emb_path}...")
-        np.savez_compressed(dense_emb_path, embeddings=embeddings)
+        checksum = hashlib.sha256("".join(codes).encode("utf-8")).hexdigest()
+        print(f"Saving compressed dense embeddings ({embeddings.shape}) with consistency metadata to {dense_emb_path}...")
+        np.savez_compressed(
+            dense_emb_path,
+            embeddings=embeddings,
+            model_id=np.array(PINNED_MODEL_ID),
+            revision=np.array(PINNED_REVISION),
+            embedding_dim=np.array(embeddings.shape[1]),
+            codes_checksum=np.array(checksum),
+        )
 
         print(f"Saving dense code mappings to {dense_codes_path}...")
         with open(dense_codes_path, "w", encoding="utf-8") as f:
@@ -115,5 +111,5 @@ def build_indexes(
 if __name__ == "__main__":
     rebuild_dense = "--bm25-only" not in sys.argv
     kb_path = "kb/enriched_kb.json"
-    model_path = "models/paraphrase-multilingual-MiniLM-L12-v2" if os.path.exists("models/paraphrase-multilingual-MiniLM-L12-v2") else "models/all-MiniLM-L6-v2"
+    model_path = "models/paraphrase-multilingual-MiniLM-L12-v2" if os.path.exists("models/paraphrase-multilingual-MiniLM-L12-v2") else PINNED_MODEL_ID
     build_indexes(kb_path, "kb", model_path, rebuild_dense=rebuild_dense)

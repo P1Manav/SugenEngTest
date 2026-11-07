@@ -34,10 +34,8 @@ Thumbs.db
 # Docker
 .docker/
 
-# Model cache & reconstructed binaries (parts are committed under 90MB each)
-models/cache/
-models/**/model.safetensors
-!models/**/model.safetensors.part*
+# Neural models downloaded at docker build time
+models/
 
 # Output & Input mount folders
 out/*

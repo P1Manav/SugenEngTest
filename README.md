@@ -22,10 +22,10 @@ Evaluated using the exact match grader (`score.py`) against valid leaf categorie
 - **600-Note Benchmark Runtime:** ~300s (~5.0 minutes), using 8.3% of the 60-minute limit (< 25 min guardrail: PASS)
 
 ### Estimated Hidden Score (600 Unseen Notes, 100 Points Total)
-- **Methodology & Honest Uncertainty:** Because the 60 dev notes were inspected during development to understand outpatient record styles and calibrate concept rules, dev metrics inherently overestimate generalization. With n=60, sampling variance is large (95% CI spanning 14.2 points on dev alone).
-- **Core Slice (450 notes, 75 pts max):** Assuming expected minor degradation on unseen core clinics (projected Top-1 ~68–78%, Top-3 ~80–88%), projected core yield is **~54–62 / 75 points**.
-- **Generalisation Slice (150 notes, 25 pts max):** Covers all 26 chapters and multilingual notes. Driven by `paraphrase-multilingual-MiniLM-L12-v2` dense retrieval (multilingual semantic alignment) and multilingual demographics/assertions, projected yield is **~14–19 / 25 points**.
-- **Net Projected Hidden Range:** Projected expected range is **~68–81 / 100 points** (with wide bootstrap intervals).
+- **Honest Estimation Methodology:** The 60 dev notes were inspected during development to understand outpatient record styles and calibrate concept rules, creating inherent sample selection optimism. With n=60, bootstrap sampling variance is substantial (95% CI spanning 14.2 points on dev).
+- **Core Slice (450 notes, 75 pts max, 50*top1 + 25*top3):** Calibrated from dev performance (63.33 / 75.0) with an evidence-based 10–15% overfit/domain-shift allowance. Expected Top-1 ~65–75%, Top-3 ~75–85% -> projected yield is **~51–59 / 75 points** (95% CI interval: [46.0, 63.0]).
+- **Generalisation Slice (150 notes, 25 pts max, 16.7*top1 + 8.3*top3):** Calibrated from the 85-note held-out multi-chapter, multilingual evaluation set (measured Top-1: 41.2%, Top-3: 57.6%, Score: 35.0 / 75.0, a 46.7% point yield). Scaling 46.7% onto the 25-point scale yields **~11.7 points**, with an empirical uncertainty range of **~9.5–13.5 / 25 points**.
+- **Net Projected Hidden Range:** Derived explicitly as Core + Generalisation: **~60.5–72.5 / 100 points** (wide bootstrap uncertainty interval: [55.5, 76.5]).
 
 ---
 
@@ -44,7 +44,7 @@ Evaluated using the exact match grader (`score.py`) against valid leaf categorie
 | `kb/who_enrichments.json` | WHO ICD-API v2 (`https://id.who.int/icd/release/11/2024-01/mms`) | CC BY-NC-ND 3.0 IGO | 93,387 official WHO index terms, definitions, inclusions, exclusions |
 | `kb/enriched_kb.json` | Derived knowledge base combining MMS structure & WHO enrichments | CC BY-NC-ND 3.0 IGO | Unified offline knowledge graph with parent-child links |
 | `kb/dense_embeddings.npz` | Pre-computed embeddings from `paraphrase-multilingual-MiniLM-L12-v2` | Apache 2.0 | 25 MB compressed float32 matrix for offline semantic lookup across 50+ languages |
-| `models/paraphrase-multilingual-MiniLM-L12-v2` | Hugging Face / Sentence-Transformers | Apache 2.0 | 117M parameter multilingual sentence encoder sharded in 5 parts <= 90MB each for zero-network CPU inference |
+| `models/paraphrase-multilingual-MiniLM-L12-v2` | Hugging Face / Sentence-Transformers | Apache 2.0 | 117M parameter multilingual sentence encoder downloaded at docker build time at pinned revision `e8f8c21` and verified via SHA-256 (`7f4f89d...`) |
 
 ---
 
@@ -72,4 +72,4 @@ python score.py --gold data/dev_notes.jsonl --pred out/predictions.jsonl --mms d
 
 ---
 
-Hours spent: ~8 hours (including 29 minutes for the audit & generalization pass)
+Hours spent: <ask me>
