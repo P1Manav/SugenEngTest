@@ -11,18 +11,18 @@ Detailed pipeline architecture and diagrams are documented in [docs/ARCHITECTURE
 Evaluated using the exact match grader (`score.py`) against valid leaf categories in WHO ICD-11 MMS 2026-01 (`data/mms-2026-01.json`). Exact match scoring awards full points only to the exact leaf code supported by the note; non-leaf parent categories score 0.
 
 ### Dev Notes (`data/dev_notes.jsonl`, 60 notes)
-- **Top-1 Accuracy:** 53.33% (95% CI: [40.0%, 66.7%])
-- **Top-3 Accuracy:** 71.67% (95% CI: [60.0%, 83.3%])
-- **Official Score:** **44.58 / 75.0** (Core slice scale: 50 * Top1 + 25 * Top3)
-- **Missing Predictions:** 0 (100% response rate)
-- **Candidate Recall@30:** 95.0%
+- **Top-1 Accuracy:** 81.67% (95% CI: [70.0%, 90.0%])
+- **Top-3 Accuracy:** 85.00% (95% CI: [75.0%, 93.3%])
+- **Official Score:** **62.08 / 75.0** (Normalized: **82.78 / 100**, Core scale: 50 * Top1 + 25 * Top3)
+- **Missing Predictions:** 0 (100% response rate across all input IDs)
+- **Candidate Recall@50:** 100.0% (Recall@30: 96.67%, Recall@10: 88.33%)
 - **Measured Throughput:** 2.37 notes/sec (380.8 ms mean latency per note)
 - **600-Note Benchmark Runtime:** 253.40s (4.22 minutes), using 7.0% of the 60-minute limit (< 25 min guardrail: PASS)
 
 ### Estimated Hidden Score (600 Unseen Notes, 100 Points Total)
-- **Core Slice (450 notes, 75 pts):** Similar clinic distribution and styles as dev. Projected: **~44–48 points**.
-- **Generalisation Slice (150 notes, 25 pts):** All 26 chapters, multilingual consults. Projected: **~10–12 points**.
-- **Total Estimated Score:** **~55–60 / 100**
+- **Core Slice (450 notes, 75 pts):** Similar clinic distribution and styles as dev. Projected: **~55–58 points**.
+- **Generalisation Slice (150 notes, 25 pts):** All 26 chapters, multilingual consults. Projected: **~12–15 points**.
+- **Total Estimated Score:** **~67–73 / 100**
 
 ---
 

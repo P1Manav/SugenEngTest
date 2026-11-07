@@ -313,3 +313,54 @@
 2. **Assertion Filter Precision Gap:** Disabling the current assertion filter boosts Top-3 from 71.7% to 80.0%, identifying false-negative clause rejections (e.g., dev-038 functional constipation where "no alarm features" negated the assessment).
 3. **Retrieval Bottleneck:** Hybrid retrieval accounts for 96.5% of pipeline latency; optimizing retrieval candidate pruning will yield major throughput gains.
 
+---
+
+## Entry 20 — 2026-11-07 11:05 IST — Specificity Descent, Clinical Assertion & Rule Reranker Accuracy Overhaul
+
+**Commit:** `cdb4b87`  
+**Task:** 3.1, 3.2, 3.7, 3.8  
+**Decision:** Overhauled candidate specificity descent, clinical assertion filtering, candidate expansion, and rule reranking based on error triage findings from the baseline diagnostic report:
+1. **Assertion Filter Clause Splitting:** Refactored `split_sentences_and_clauses` in `assertion_filter.py` to evaluate parentheticals `(...)` and question mark queries `\?` (e.g. `anaemia in pregnancy ?Fe def`) as distinct subclauses. This prevents confirmed diagnoses with uncertain etiologies from being falsely rejected as "ruled out" differentials.
+2. **Expansion Truncation Fix:** Increased `max_expansions` from 50 to 120 in `pipeline.py`. High-branch categories (e.g. `DA60` gastric ulcer) previously generated dozens of children that pushed genuine retrieved categories like `DA61` (peptic ulcer, site unspecified) out of the candidate pool.
+3. **Negation Filter on Expanded Candidates:** Re-applied assertion negation checking to all candidates post-hierarchy expansion. This prevents negated organisms (e.g. `DA42.1` H. pylori induced gastritis when `H. pylori stool Ag NEGATIVE`) from being re-introduced by parent expansion.
+4. **Distinguishing Qualifier Verification:** In `reranker.py`, candidate specificity is now verified against distinguishing tokens between the candidate and its parent. If distinguishing qualifiers (e.g. duodenogastric reflux, parainfluenza) are absent from the clinical note, specificity bonuses are withheld and a specificity penalty (`-0.06`) is applied, ensuring that unspecified (`.Z`) codes are correctly selected when clinical detail is absent.
+5. **Negative Qualifier Alignment:** Evaluated "without [coma/complication]" and "no mention of [TB/malaria]" as supported when the complication is absent from the note, resolving `5A21.0` (hypoglycaemia without coma) and `1C62.0` (HIV stage 1 without TB/malaria).
+6. **Clinical Domain & Taxonomy Filtering:**
+   - Demoted Chapter 26 (Traditional Medicine `S...`) codes (`-0.35`) and Chapter 20 (Developmental / Genetic anomalies `LD...`) codes (`-0.35`) for standard outpatient consults.
+   - Demoted Chapter 24 (Administrative encounter `Q...`) codes (`-0.25`) when definitive acute or chronic disease is diagnosed.
+   - Enforced biological sex consistency: male patients cannot receive obstetric/puerperal codes (`JA`/`JB`) or female genital (`GA`); female patients cannot receive male genital (`GB`).
+   - Enforced age consistency: adults >= 18 cannot receive neonatal (`KA`) or retinopathy of prematurity (`9B71.3`).
+   - Demoted `.Y` (Other specified) codes relative to `.Z` (Unspecified) by `-0.06` unless explicitly specified.
+
+### Empirical Measurements & Verification on Dev Notes (60 notes)
+- **Top-1 Accuracy:** Jumped from 53.33% (32/60) to **81.67% (49/60)** (+28.34% absolute improvement).
+- **Top-3 Accuracy:** Jumped from 71.67% (43/60) to **85.00% (51/60)** (+13.33% absolute improvement).
+- **Official Grader Score:** Jumped from 44.58 / 75.0 to **62.08 / 75.0** (Normalized: **82.78 / 100**).
+- **Candidate Recall@50:** Reached **100.0% (60/60)** (Zero retrieval misses).
+- **Performance by Style:**
+  - Ambient Transcripts: **93.3% Top-1 (14/15)** | **93.3% Top-3 (14/15)**
+  - Short Consults: **81.2% Top-1 (13/16)** | **87.5% Top-3 (14/16)**
+  - Typed Consults: **75.9% Top-1 (22/29)** | **79.3% Top-3 (23/29)**
+- **Performance by Chapter:**
+  - Chapter 12 (Respiratory): 100.0% Top-1 (7/7) | 100.0% Top-3 (7/7)
+  - Chapter 14 (Skin): 100.0% Top-1 (3/3) | 100.0% Top-3 (3/3)
+  - Chapter 15 (Musculoskeletal): 100.0% Top-1 (4/4) | 100.0% Top-3 (4/4)
+  - Chapter 18 (Pregnancy): 80.0% Top-1 (4/5) | 100.0% Top-3 (5/5)
+  - Chapter 01 (Infections): 84.6% Top-1 (11/13) | 84.6% Top-3 (11/13)
+  - Chapter 11 (Circulatory): 83.3% Top-1 (5/6) | 83.3% Top-3 (5/6)
+  - Chapter 13 (Digestive): 83.3% Top-1 (5/6) | 100.0% Top-3 (6/6)
+
+### Updated Empirical Ablation Results on Dev (60 notes)
+
+| Ablation Variant | Top-1 Accuracy (95% CI) | Top-3 Accuracy (95% CI) | Score / 75.0 (95% CI) | Recall@30 | Runtime |
+|:---|:---:|:---:|:---:|:---:|:---:|
+| **Full Baseline** | **81.7%**<br>[70.0%, 90.0%] | **85.0%**<br>[75.0%, 93.3%] | **62.08**<br>[54.17, 68.75] | 96.7% | 23.8s |
+| Dense-only (no BM25) | **75.0%**<br>[63.3%, 86.7%] | **83.3%**<br>[73.3%, 91.7%] | **58.33**<br>[50.42, 65.83] | 85.0% | 5.2s |
+| BM25-only (no Dense) | **76.7%**<br>[65.0%, 86.7%] | **81.7%**<br>[71.6%, 90.0%] | **58.75**<br>[50.42, 65.83] | 96.7% | 20.4s |
+| No Abbreviations | **80.0%**<br>[68.3%, 90.0%] | **86.7%**<br>[76.7%, 95.0%] | **61.67**<br>[54.17, 68.33] | 96.7% | 22.9s |
+| No Assertion Filter | **76.7%**<br>[65.0%, 86.7%] | **85.0%**<br>[75.0%, 93.3%] | **59.58**<br>[51.25, 66.67] | 100.0% | 24.4s |
+| No Specificity Descent | **43.3%**<br>[31.7%, 56.7%] | **48.3%**<br>[35.0%, 61.7%] | **33.75**<br>[24.58, 42.94] | 83.3% | 21.3s |
+| No Reranker | **46.7%**<br>[35.0%, 60.0%] | **70.0%**<br>[58.3%, 81.7%] | **40.83**<br>[32.92, 49.58] | 96.7% | 24.2s |
+
+**What decided it:** Satisfies P2 accuracy upgrade objectives. All 12 unit tests pass. Merge gate verified.
+

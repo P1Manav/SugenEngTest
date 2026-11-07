@@ -61,3 +61,4 @@ flowchart TD
 - Awards specificity bonuses for explicit clinical qualifiers.
 - Demotes generic symptom/sign codes (Chapter 21) when definitive disease categories are present.
 - Emits up to 3 leaf codes: Rank 1 is the primary leaf, Rank 2 is an alternate specificity variant or top secondary diagnosis, Rank 3 is an additional supported leaf.
+
