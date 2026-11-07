@@ -545,6 +545,28 @@
 - Dev Notes: 63.33 / 75.0 (Top-1 81.67%, Top-3 90.00%, Recall@50 100.0%)
 - Held-Out Notes: 35.0 / 75.0 (Top-1 41.18%, Top-3 57.65%)
 
+---
+
+## Entry 26 — 2026-11-07 22:39 IST — Verification of Hugging Face SafeTensors Checksum, Standby Bundle Shrink Plan, and Realistic Score Calibration
+
+**Commit:** `28ff385`  
+**Task:** Verify Hugging Face pinned revision and model weights checksum against live Hugging Face Hub, document standby `git filter-repo` procedure, reserve hours field for user, and calibrate realistic 55–66 hidden-score expectation.  
+**Decision:**
+1. **Hugging Face Pin & SHA-256 Resolution:**
+   - Queried Hugging Face Hub directly via `huggingface_hub` API for `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` at revision `e8f8c211226b894fcb81acc59f3b34ba3efd5f42`.
+   - Identified discrepancy: the locally re-serialized `model.safetensors` had SHA-256 `7f4f89d...` due to local header differences, while the actual official Hugging Face repository snapshot contains `model.safetensors` with SHA-256 `eaa086f0ffee582aeb45b36e34cdd1fe2d6de2bef61f8a559a1bbc9bd955917b` (470,641,600 bytes).
+   - Updated `scripts/download_models.py` with the verified upstream SHA-256 (`eaa086f...`) and added `allow_patterns` to avoid downloading redundant PyTorch `.bin` (470 MB), ONNX (470 MB), and OpenVINO (470 MB) artifacts, reducing build download size by >70% (~480 MB total, downloaded and verified in 3 seconds).
+   - Verified that `tests/test_embedding_consistency.py` passes 100% with `cosine > 0.99` against stored vectors when loaded from the verified download.
+2. **Documented Standby `git filter-repo` Plan:**
+   - Created `docs/BUNDLE_SHRINK_PLAN.md` documenting the complete procedure to strip `models/` and historical embedding blobs across Git history if required by Sugen.
+   - Included exact commands, backup instructions, and a Python remapping script (`scripts/remap_decisions_hashes.py`) to systematically update all commit hashes cited in `DECISIONS.md` using `.git/filter-repo/commit-map`.
+3. **Honest Score Estimate & Reserved Hours:**
+   - Re-calibrated `README.md` to reflect an honest realistic hidden score expectation of **~55–66 / 100 points** (Core slice ~46–55 / 75 with 15–25% generalization drop; Generalisation slice ~9–11 / 25 based on the optimistic 34.71/75 smoke set).
+   - Reverted `Hours spent:` to `<ask me>`, strictly reserving the field for the user's personal reporting.
+4. **Verification Pass:**
+   - Ran `scripts/full_check.sh`: Ruff clean, 35/35 unit tests pass, isolated sandbox check 100% PASS with 0 errors and 0 constant fallbacks.
+
+
 
 
 
