@@ -65,7 +65,7 @@ def build_indexes(
         pickle.dump(bm25_artifact, f, protocol=pickle.HIGHEST_PROTOCOL)
 
     # 2. Build Dense index
-    dense_emb_path = os.path.join(out_dir, "dense_embeddings.npy")
+    dense_emb_path = os.path.join(out_dir, "dense_embeddings.npz")
     dense_codes_path = os.path.join(out_dir, "dense_codes.json")
 
     if rebuild_dense or not (os.path.exists(dense_emb_path) and os.path.exists(dense_codes_path)):
@@ -83,8 +83,8 @@ def build_indexes(
             convert_to_numpy=True,
         ).astype(np.float32)
 
-        print(f"Saving dense embeddings ({embeddings.shape}) to {dense_emb_path}...")
-        np.save(dense_emb_path, embeddings)
+        print(f"Saving compressed dense embeddings ({embeddings.shape}) to {dense_emb_path}...")
+        np.savez_compressed(dense_emb_path, embeddings=embeddings)
 
         print(f"Saving dense code mappings to {dense_codes_path}...")
         with open(dense_codes_path, "w", encoding="utf-8") as f:
