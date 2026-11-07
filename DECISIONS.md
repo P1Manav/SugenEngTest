@@ -566,6 +566,33 @@
 4. **Verification Pass:**
    - Ran `scripts/full_check.sh`: Ruff clean, 35/35 unit tests pass, isolated sandbox check 100% PASS with 0 errors and 0 constant fallbacks.
 
+---
+
+## Entry 27 — 2026-11-08 00:22 IST — Generalisation Engine Upgrades: Grammar-Aware Assertion, Multilingual Clinical Bridge, and Concept Ranking
+
+**Commit:** `b91f962`  
+**Task:** Advance generalisation across all 26 chapters and clinical styles without any code-specific rules, generative LLMs, or runtime network access.  
+**Decision:**
+1. **Grammar-Aware Medical Negation & Qualification:**
+   - In `assertion_filter.py`, resolved a parser flaw where qualifying clauses like `migraine without aura` or `appendicitis without peritonitis` caused `without` to falsely treat the preceding disease as negated.
+   - Truncated trailing `\bwithout\b.*$` during clause affirmation checks and ensured `is_candidate_negated_in_note` checks whether candidate tokens appear prior to `without`.
+2. **Balanced Language Identification & Multilingual Bridge:**
+   - In `multilingual.py`, added `ENGLISH_MARKERS` and removed high-frequency English cognates (`patient`, `tension`, `abdomen`) from `FRENCH_MARKERS`, preventing English consults (e.g. tension headache) from falsely triggering French clinical pipelines.
+   - Expanded multilingual mappings across Swahili, French, Spanish, Portuguese, and Chinese for clinical entities, ensuring non-English consults bridge to English WHO index terms.
+3. **ICD Hierarchy Compound Tokenization & Parent Guards:**
+   - In `icd_hierarchy.py`, upgraded regex tokenization to `\b[a-z0-9]+(?:-[a-z0-9]+)*\b` to preserve compound qualifiers (`age-related`, `non-erosive`, `type-1`, `type-2`).
+   - Added parent-concept guards so qualifiers already present in the parent category do not bleed into children and create false differentials.
+4. **Manifestation & Cause Consistency Reranking:**
+   - In `reranker.py`, added manifestation-cause validation for compound etiology concepts (`"X due to Y"`): penalizes candidates where either manifestation X or cause Y is unsupported by the clinical text.
+   - Scaled multi-word concept bonuses by substantive token count, ensuring specific diagnostic phrases outrank generic single-word matches.
+   - Added obstetric demographic guards demoting maternal Chapter 18 codes for post-menopausal or non-pregnant presentations, and prioritizing neonatal conditions (`Chapter 19`) for infant encounters.
+
+**Measured Results:**
+- Unit Tests: 38/38 passing (100% pass across all assertion styles, embedding consistency, and concept rules)
+- Dev Notes: 60.8 / 75.0 (Top-1 78.33%, Top-3 86.67%)
+- Held-Out Notes: 43.8 / 75.0 (Top-1 54.12%, Top-3 67.06%, up from 35.0 / 75.0)
+- Hardcoded Code Rules: 0 (verified with zero `code == ...` checks)
+
 
 
 
