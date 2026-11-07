@@ -276,7 +276,7 @@
 
 ## Entry 19 — 2026-11-07 10:25 IST — Diagnostic Triage, Ablation Harness & Latency Profiling Tooling
 
-**Commit:** `<to-be-committed>`  
+**Commit:** `21dd79d`  
 **Task:** 2.1, 2.2, 2.3, 2.4  
 **Decision:** Built comprehensive diagnostic, benchmarking, and merge gate verification tooling prior to any model or algorithmic upgrades:
 1. `scripts/failure_report.py`: Categorizes errors into 5 diagnostic buckets (Retrieval Miss, Reranker Demotion, Specificity Error, Assertion Failure, Language Issue) with candidate Recall@10/30/50, and breaks down performance by style and chapter. Baseline report saved to `docs/baseline_failure_report.txt`.
