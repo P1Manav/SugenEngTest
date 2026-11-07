@@ -26,6 +26,7 @@ COPY scripts/ scripts/
 COPY text_utils.py .
 COPY assertion_filter.py .
 COPY diagnosis_extractor.py .
+COPY clinical_concepts.py .
 COPY icd_hierarchy.py .
 COPY retrieval.py .
 COPY reranker.py .
@@ -36,6 +37,7 @@ COPY build_index.py .
 COPY entrypoint.py .
 COPY evaluate.py .
 COPY score.py .
+COPY rules/ rules/
 COPY tests/ tests/
 
 # Copy MMS source data and dev data

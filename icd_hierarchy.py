@@ -8,6 +8,8 @@ import os
 import re
 from typing import Any
 
+from clinical_concepts import extract_clinical_qualifiers
+
 # Clinical and anatomical qualifiers and their equivalent expressions
 CLINICAL_QUALIFIER_EQUIVALENTS: dict[str, list[str]] = {
     "distal": ["distal", "lower end", "inferior", "caudal"],
@@ -183,6 +185,8 @@ class ICDHierarchy:
         best_child = None
         best_score = 0
 
+        qualifiers_set = extract_clinical_qualifiers(text)
+
         for ch in children:
             ch_info = self.kb.get(ch)
             if not ch_info:
@@ -210,66 +214,30 @@ class ICDHierarchy:
                         score += 10
                         break
 
-            # 2. Check "without complication" special handling
-            if "without complication" in ch_info.get("title", "").lower():
+            # 2. General complication alignment
+            title_lower = ch_info.get("title", "").lower()
+            if "without complication" in title_lower or "uncomplicated" in title_lower:
                 if any(phrase in text_lower for phrase in ["no complication", "no complications", "uncomplicated", "without complication"]):
                     score += 15
-                elif ch == "1D80.0" and not any(comp in text_lower for comp in ["orchitis", "meningitis", "pancreatitis", "encephalitis"]):
+                elif not any(comp in text_lower for comp in ["orchitis", "meningitis", "pancreatitis", "encephalitis", "abscess", "perforation", "severe", "failure"]):
                     score += 12
+                else:
+                    score -= 10
+            elif "with complication" in title_lower:
+                if any(comp in text_lower for comp in ["complication", "orchitis", "meningitis", "pancreatitis", "encephalitis", "abscess", "perforation", "severe"]):
+                    score += 15
+                elif any(phrase in text_lower for phrase in ["no complication", "no complications", "uncomplicated", "without complication"]):
+                    score -= 15
 
-            # 3. Clinical decision rules for high-frequency outpatient branches
-            parent_code = ch_info.get("parent")
-            if parent_code == "BA00":
-                # Blood pressure parsing for essential hypertension subtypes
-                if ch == "BA00.0" and re.search(r"\b(1[4-9]\d|[2-9]\d\d)\s*/\s*(9\d|1\d\d)\b", text_lower):
+            # 3. Clinical concept qualifier matching against child title, synonyms, and inclusions
+            ch_terms = [title_lower] + [s.lower() for s in synonyms]
+            for qual in qualifiers_set:
+                if any(qual in term for term in ch_terms):
                     score += 18
-                elif ch == "BA00.2" and re.search(r"\b(1[4-9]\d|[2-9]\d\d)\s*/\s*([6-8]\d)\b", text_lower):
-                    score += 18
-                elif ch == "BA00.1" and re.search(r"\b(1[0-3]\d)\s*/\s*(9\d|1\d\d)\b", text_lower):
-                    score += 18
-            elif parent_code == "4A84":
-                # Anaphylaxis triggers
-                if ch == "4A84.0" and any(food_w in text_lower for food_w in ["peanut", "groundnut", "food", "biscuit", "milk", "egg", "fish", "wheat"]):
-                    score += 18
-            elif parent_code == "EK00":
-                # Contact dermatitis due to metals/nickel
-                if ch == "EK00.6" and any(m_w in text_lower for m_w in ["nickel", "metal", "stud", "earring", "buckle", "jewellery"]):
-                    score += 18
-            elif parent_code == "BA40":
-                # Stable vs unstable angina
-                if ch == "BA40.1" and any(st_w in text_lower for st_w in ["stable", "exertion", "exertional", "walking", "climbing", "relieved by rest"]):
-                    score += 18
-            elif parent_code == "5A40":
-                # Impaired fasting glucose vs prediabetes
-                if ch == "5A40.0" and any(fg_w in text_lower for fg_w in ["fasting", "fbs", "ifg", "impaired fasting"]):
-                    score += 18
-            elif parent_code == "5B81":
-                # Obesity in adults
-                if ch == "5B81.0" and ("bmi" in text_lower or not any(ped in text_lower for ped in ["child", "infant", "paed", "pediatric"])):
-                    score += 18
-            elif parent_code == "5B81.0":
-                if ch == "5B81.01" and not any(ped in text_lower for ped in ["child", "infant", "paed", "pediatric"]):
-                    score += 18
-            elif parent_code == "CA22":
-                # COPD with acute exacerbation
-                if ch == "CA22.0" and any(ex_w in text_lower for ex_w in ["exacerbation", "increased breathlessness", "increased sputum"]):
-                    score += 18
-            elif parent_code == "QA42":
-                # Normal first pregnancy
-                if ch == "QA42.0" and any(fp_w in text_lower for fp_w in ["first pregnancy", "g1p0", "g1", "primigravida"]):
-                    score += 18
-            elif parent_code == "5A00":
-                # Acquired hypothyroidism in adults
-                if ch == "5A00.2" and not any(cong in text_lower for cong in ["congenital", "infant", "child"]):
-                    score += 18
-            elif parent_code == "FA0":
-                # Osteoarthritis of knee
-                if ch == "FA01" and any(kn in text_lower for kn in ["knee", "knees"]):
-                    score += 18
+                    break
 
-            # 2. Distinguishing qualifier tokens between child and parent
-            title = ch_info.get("title", "").lower()
-            words = set(re.findall(r"\b[a-z0-9]{3,}\b", title)) - STOP_WORDS
+            # 4. Qualifier-differential token matching between child and siblings/parent
+            words = set(re.findall(r"\b[a-z0-9]{3,}\b", title_lower)) - STOP_WORDS
             if not words and score == 0:
                 continue
 
@@ -282,15 +250,12 @@ class ICDHierarchy:
             qualifiers = words - parent_words
             target_words = qualifiers if qualifiers else words
 
-            # Match qualifiers with word boundaries & clinical synonyms
             qualifier_matches = 0
             for w in target_words:
                 matched_w = False
-                # Direct word boundary match
                 if re.search(r"\b" + re.escape(w) + r"\b", text_lower):
                     matched_w = True
                 else:
-                    # Check clinical equivalents (e.g., distal <-> lower end)
                     eq_list = CLINICAL_QUALIFIER_EQUIVALENTS.get(w, [])
                     for eq in eq_list:
                         if re.search(r"\b" + re.escape(eq) + r"\b", text_lower):
@@ -300,9 +265,8 @@ class ICDHierarchy:
                 if matched_w:
                     qualifier_matches += 1
 
-            # Only count qualifier score if at least one distinguishing qualifier matched
             if qualifiers and qualifier_matches > 0:
-                score += qualifier_matches * 2
+                score += qualifier_matches * 3
             elif not qualifiers and qualifier_matches > 0:
                 score += qualifier_matches
 

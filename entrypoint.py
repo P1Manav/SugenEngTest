@@ -79,9 +79,12 @@ def get_standalone_bm25_fallback(raw_text: str) -> list[str]:
     try:
         with open("kb/valid_codes.json", "r", encoding="utf-8") as f:
             valid = json.load(f)
-        return valid[:3]
-    except Exception:
-        return ["1A00.Z", "CA40.Z", "1F40.Z"]
+        if valid and len(valid) >= 3:
+            return valid[:3]
+        raise ValueError("kb/valid_codes.json has fewer than 3 codes")
+    except Exception as e:
+        sys.stderr.write(f"[FATAL] Cannot load valid codes fallback from kb/valid_codes.json: {e}\n")
+        sys.exit(1)
 
 
 def init_worker():

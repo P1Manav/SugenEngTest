@@ -1,0 +1,93 @@
+# Clinical Concept Knowledge Rules
+# Keyed strictly by clinical concept (never by an ICD code).
+# Each entry provides a one-line clinical justification, regex extraction patterns,
+# and standardized qualifying phrases for matching against WHO MMS titles, inclusions, and index terms.
+
+blood_pressure_phenotypes:
+  justification: "Classifies recorded blood pressure readings (systolic/diastolic in mmHg) into standardized hemodynamic phenotypes across cardiovascular and maternal encounters."
+  rules:
+    - concept: "combined_systolic_and_diastolic_hypertension"
+      systolic_min: 140
+      diastolic_min: 90
+      qualifier_terms: ["combined diastolic and systolic", "systolic and diastolic", "combined hypertension"]
+    - concept: "isolated_systolic_hypertension"
+      systolic_min: 140
+      diastolic_max: 89
+      qualifier_terms: ["isolated systolic", "systolic hypertension"]
+    - concept: "isolated_diastolic_hypertension"
+      systolic_max: 139
+      diastolic_min: 90
+      qualifier_terms: ["isolated diastolic", "diastolic hypertension"]
+
+obstetric_parity:
+  justification: "Normalizes obstetric abbreviations (G1P0, primigravida, multigravida) to standard pregnancy parity qualifiers across antenatal and peripartum care."
+  rules:
+    - concept: "first_pregnancy"
+      patterns: ["\\bg1p0\\b", "\\bprimigravida\\b", "\\bfirst pregnancy\\b", "\\bfirst baby\\b", "\\bprimi\\b", "\\bg1\\b"]
+      qualifier_terms: ["first pregnancy", "primigravida", "primiparous"]
+    - concept: "subsequent_pregnancy"
+      patterns: ["\\bg[2-9]p\\d\\b", "\\bmultigravida\\b", "\\bmultipara\\b", "\\bsecond pregnancy\\b", "\\bthird pregnancy\\b"]
+      qualifier_terms: ["other pregnancy", "subsequent pregnancy", "multipara"]
+
+angina_presentation:
+  justification: "Distinguishes exertional/stable chest pain from unstable rest angina across ischemic heart disease entities."
+  rules:
+    - concept: "stable_angina"
+      patterns: ["\\bexertion\\b", "\\bexertional\\b", "\\bon walking\\b", "\\bclimbing\\b", "\\brelieved by rest\\b", "\\bpredictable\\b", "\\bstable angina\\b"]
+      qualifier_terms: ["stable", "angina pectoris, stable", "exertional"]
+    - concept: "unstable_angina"
+      patterns: ["\\bat rest\\b", "\\baccelerating\\b", "\\bworsening at rest\\b", "\\bunstable angina\\b", "\\bcrescendo\\b"]
+      qualifier_terms: ["unstable", "angina pectoris, unstable", "rest angina"]
+
+age_bracket:
+  justification: "Differentiates adult vs pediatric/congenital disease manifestations across metabolic, endocrine, and nutritional disorders."
+  rules:
+    - concept: "adult_onset"
+      patterns: ["\\badult\\b", "\\b\\d{2}\\s*(?:yo|y/o|m|f|year old)\\b", "\\bbmi\\b"]
+      negative_patterns: ["\\bchild\\b", "\\binfant\\b", "\\bneonat\\w*\\b", "\\bcongenital\\b", "\\bpediatric\\b", "\\bpaediatric\\b"]
+      qualifier_terms: ["adult", "adults", "in adults", "acquired"]
+    - concept: "pediatric_or_congenital"
+      patterns: ["\\bchild\\b", "\\binfant\\b", "\\bneonat\\w*\\b", "\\bcongenital\\b", "\\bpediatric\\b", "\\bpaediatric\\b", "\\bbirth\\b"]
+      qualifier_terms: ["child", "children", "in children", "congenital", "neonatal"]
+
+food_allergy_triggers:
+  justification: "Normalizes dietary ingestion triggers (nuts, peanuts, milk, eggs, seafood, wheat, biscuits) to food-induced allergic phenotypes across anaphylaxis and urticaria."
+  rules:
+    - concept: "food_trigger"
+      patterns: ["\\bgroundnut\\b", "\\bpeanut\\b", "\\bbiscuit\\b", "\\bfood\\b", "\\bmilk\\b", "\\begg\\b", "\\bfish\\b", "\\bwheat\\b", "\\bnut\\b", "\\bseafood\\b"]
+      qualifier_terms: ["food", "due to food", "food-induced", "ingestion"]
+
+contact_sensitizers:
+  justification: "Maps metal and environmental contact allergens (nickel, studs, earrings, buckles, jewelry) to contact dermatitis qualifiers across dermatological conditions."
+  rules:
+    - concept: "metal_allergen"
+      patterns: ["\\bnickel\\b", "\\bmetal\\b", "\\bstud\\b", "\\bearring\\b", "\\bbuckle\\b", "\\bjewellery\\b", "\\bjewelry\\b"]
+      qualifier_terms: ["metals", "due to metals", "nickel", "metal"]
+
+respiratory_exacerbation:
+  justification: "Identifies acute exacerbation triggers and symptom escalation across chronic respiratory diseases."
+  rules:
+    - concept: "acute_exacerbation"
+      patterns: ["\\bexacerbation\\b", "\\bincreased breathlessness\\b", "\\bincreased sputum\\b", "\\bworsening dyspnea\\b", "\\bacute flare\\b"]
+      qualifier_terms: ["exacerbation", "acute exacerbation", "with acute exacerbation"]
+
+glycaemic_state:
+  justification: "Identifies fasting vs postprandial glucose impairment states across metabolic and endocrine conditions."
+  rules:
+    - concept: "impaired_fasting_glucose"
+      patterns: ["\\bfasting\\b", "\\bfbs\\b", "\\bifg\\b", "\\bimpaired fasting\\b"]
+      qualifier_terms: ["fasting", "impaired fasting glucose", "fasting glycaemia"]
+
+anatomical_sites:
+  justification: "Extracts primary anatomical site qualifiers across musculoskeletal, arthritic, and localized soft-tissue conditions."
+  rules:
+    - concept: "knee"
+      patterns: ["\\bknee\\b", "\\bknees\\b", "\\bpatell\\w*\\b"]
+      qualifier_terms: ["knee", "knees"]
+    - concept: "hip"
+      patterns: ["\\bhip\\b", "\\bhips\\b", "\\bcoxa\\b"]
+      qualifier_terms: ["hip", "hips"]
+    - concept: "hand_wrist"
+      patterns: ["\\bhand\\b", "\\bhands\\b", "\\bwrist\\b", "\\bwrists\\b", "\\bcarpal\\b"]
+      qualifier_terms: ["hand", "wrist"]
+

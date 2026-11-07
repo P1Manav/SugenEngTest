@@ -58,6 +58,23 @@ class TestRuntimeHygiene(unittest.TestCase):
         # Should match malaria falciparum (1F40.Z)
         self.assertTrue(any(c.startswith("1F4") for c in fallback))
 
+    def test_no_constant_code_fallbacks(self):
+        """Verify that zero constant-code fallback lists exist anywhere in runtime code."""
+        runtime_files = ["entrypoint.py", "pipeline.py", "retrieval.py", "icd_hierarchy.py", "reranker.py"]
+        forbidden_constants = [
+            '["1A00.Z", "CA40.Z", "1F40.Z"]',
+            "['1A00.Z', 'CA40.Z', '1F40.Z']",
+            '["RA01"]',
+            "['RA01']",
+        ]
+        for fname in runtime_files:
+            if not os.path.exists(fname):
+                continue
+            with open(fname, "r", encoding="utf-8") as f:
+                content = f.read()
+            for constant in forbidden_constants:
+                self.assertNotIn(constant, content, f"Forbidden constant {constant} found in {fname}")
+
     def test_resume_capability(self):
         """Verify entrypoint resume logic skips already processed IDs without duplication."""
         with tempfile.NamedTemporaryFile("w+", delete=False, encoding="utf-8") as tmp_out:

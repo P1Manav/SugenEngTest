@@ -5,6 +5,7 @@ Combines retrieval scores with lexical overlap, section presence, and specificit
 import re
 from typing import Any
 
+from clinical_concepts import extract_clinical_qualifiers
 from text_utils import tokenize
 
 
@@ -225,12 +226,16 @@ class RuleReranker:
         age = int(age_match.group(1)) if age_match else None
         if age is not None:
             if age >= 18:
-                # Adults cannot have neonatal diseases (Ch 19: KA) or retinopathy of prematurity
-                if chapter == "19" or code.startswith("KA") or code == "9B71.3":
+                # Adults cannot have neonatal diseases or conditions of prematurity
+                if chapter == "19" or code.startswith("KA") or "prematurity" in title or "neonatal" in title:
                     score -= 0.40
+                elif "in adults" in title or "adult" in title:
+                    score += 0.06
             elif age < 12:
                 if "in adults" in title:
                     score -= 0.40
+                elif "in children" in title or "child" in title:
+                    score += 0.06
 
         # 9. Pregnancy & obstetric consistency
         is_pregnant = bool(re.search(r"\b(anc\b|antenatal|pregnant|pregnancy|gestation|trimester|fundal|fhr|edd|g\d+p\d+|\d+/\d+\s*weeks?)\b", note_text, re.IGNORECASE))
@@ -240,9 +245,9 @@ class RuleReranker:
                 score -= 0.40
         elif is_pregnant:
             # In pregnancy, obstetric chapter conditions take precedence
-            if chapter == "18" or code.startswith(("JA", "JB")):
+            if chapter == "18" or code.startswith(("JA", "JB")) or "pregnancy" in title or "maternal" in title:
                 score += 0.08
-            elif code.startswith("GC00"):  # Non-obstetric cystitis
+            elif "cystitis" in title and ("pregnancy" not in title and "maternal" not in title and "obstetric" not in title):
                 score -= 0.08
 
         # 10. Chapter 24 administrative encounter vs definitive disease
@@ -254,9 +259,9 @@ class RuleReranker:
         if "falciparum" in note_lower:
             if "falciparum" in title:
                 score += 0.08
-            if code == "1F4Z":
-                score -= 0.10
-            if any(other_sp in title for other_sp in ["malariae", "vivax", "ovale"]):
+            elif "malaria" in title and ("unspecified" in title or "other" in title):
+                score -= 0.08
+            elif any(other_sp in title for other_sp in ["malariae", "vivax", "ovale"]):
                 score -= 0.12
         elif "malariae" in note_lower:
             if any(other_sp in title for other_sp in ["falciparum", "vivax", "ovale"]):
@@ -264,7 +269,7 @@ class RuleReranker:
 
         # 12. Uncomplicated / complicated clinical alignment
         if any(uncomp in note_lower for uncomp in ["uncomplicated", "no complication", "no complications", "without complication"]):
-            if "without complication" in title:
+            if "without complication" in title or "uncomplicated" in title:
                 score += 0.06
             elif code.endswith(".Z") or code.endswith("Z"):
                 score += 0.02
@@ -278,22 +283,31 @@ class RuleReranker:
 
         # 14. Peptic ulcer unconfirmed site
         if "peptic ulcer" in note_lower and any(unsp in note_lower for unsp in ["not confirmed", "haven't confirmed", "site unspecified", "stomach or duodenum"]):
-            if code == "DA61":
+            if "peptic ulcer" in title and ("site unspecified" in title or "unspecified" in title):
                 score += 0.08
 
-        # 15. Knee Osteoarthritis site specificity
-        if any(kn in note_lower for kn in ["knee", "knees"]) and "osteoarthritis" in note_lower:
-            if code == "FA01.Z" or code == "FA01":
-                score += 0.08
-            elif code == "FA0Z":
-                score -= 0.06
+        # 15. Anatomical site specificity (osteoarthritis, fractures, etc.)
+        if "osteoarthritis" in note_lower:
+            for site in ["knee", "hip", "hand", "wrist", "shoulder", "ankle", "spine"]:
+                if site in note_lower:
+                    if site in title:
+                        score += 0.08
+                    elif "unspecified" in title or "other" in title:
+                        score -= 0.06
 
         # 16. Adult obesity
         if any(ob in note_lower for ob in ["obesity", "bmi"]) and not any(ped in note_lower for ped in ["child", "infant", "pediatric"]):
-            if code == "5B81.01":
+            if "in adults" in title or "adult" in title:
                 score += 0.08
 
-        # 17. Bacteriologically confirmed alignment
+        # 17. Active clinical concept qualifiers
+        active_qualifiers = extract_clinical_qualifiers(note_text)
+        for q in active_qualifiers:
+            if q in title:
+                score += 0.06
+                break
+
+        # 18. Bacteriologically confirmed alignment
         if "confirmed" in note_lower and "confirmed" in title:
             score += 0.04
 

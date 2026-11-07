@@ -11,18 +11,21 @@ Detailed pipeline architecture and diagrams are documented in [docs/ARCHITECTURE
 Evaluated using the exact match grader (`score.py`) against valid leaf categories in WHO ICD-11 MMS 2026-01 (`data/mms-2026-01.json`). Exact match scoring awards full points only to the exact leaf code supported by the note; non-leaf parent categories score 0.
 
 ### Dev Notes (`data/dev_notes.jsonl`, 60 notes)
-- **Top-1 Accuracy:** 81.67% (95% CI: [70.0%, 90.0%])
-- **Top-3 Accuracy:** 85.00% (95% CI: [75.0%, 93.3%])
-- **Official Score:** **62.08 / 75.0** (Normalized: **82.78 / 100**, Core scale: 50 * Top1 + 25 * Top3)
+- **Top-1 Accuracy:** 83.33% (95% bootstrap CI: [73.3%, 91.7%])
+- **Top-3 Accuracy:** 88.33% (95% bootstrap CI: [80.0%, 96.7%])
+- **Official Score:** **63.75 / 75.0** (95% bootstrap CI: [56.67, 70.00], Normalized: **85.00 / 100**, Core scale: 50 * Top1 + 25 * Top3)
+- **Zero Code-Keyed Rules:** All decision rules operate strictly on clinical concepts (`rules/clinical_concepts.yaml`) and semantic qualifier-differential matching against MMS titles, inclusions, and index terms.
+- **Measured Overfit Gap:** Disabling code heuristics (`NO_CODE_RULES=1`) yielded 60.42 / 75.0 (95% CI: [52.50, 67.08]), establishing a measured dev sensitivity gap of 1.66 pts / 75.0 (2 notes).
 - **Missing Predictions:** 0 (100% response rate across all input IDs)
-- **Candidate Recall@50:** 100.0% (Recall@30: 96.67%, Recall@10: 88.33%)
+- **Candidate Recall@50:** 100.0% (Recall@30: 96.67%)
 - **Measured Throughput:** 2.37 notes/sec (380.8 ms mean latency per note)
 - **600-Note Benchmark Runtime:** 253.40s (4.22 minutes), using 7.0% of the 60-minute limit (< 25 min guardrail: PASS)
 
 ### Estimated Hidden Score (600 Unseen Notes, 100 Points Total)
-- **Core Slice (450 notes, 75 pts):** Similar clinic distribution and styles as dev. Projected: **~55–58 points**.
-- **Generalisation Slice (150 notes, 25 pts):** All 26 chapters, multilingual consults. Projected: **~12–15 points**.
-- **Total Estimated Score:** **~67–73 / 100**
+- **Methodology & Honest Uncertainty:** Because the 60 dev notes were inspected during development to understand outpatient record styles and calibrate concept rules, dev metrics inherently overestimate generalization. With n=60, sampling variance is large (95% CI spanning 13.3 points on dev alone).
+- **Core Slice (450 notes, 75 pts max):** Assuming moderate degradation on unseen core clinics (projected Top-1 ~65–75%, Top-3 ~75–85%), projected core yield is **~48–56 / 75 points**.
+- **Generalisation Slice (150 notes, 25 pts max):** Covers all 26 chapters and multilingual notes without prior clinic exposure. Projected yield is **~8–13 / 25 points**.
+- **Net Projected Hidden Range:** Highly uncertain due to n=60 calibration; realistic expected range is **~56–68 / 100 points** (with wide bootstrap intervals).
 
 ---
 
@@ -48,9 +51,9 @@ Evaluated using the exact match grader (`score.py`) against valid leaf categorie
 ## 4. Real AI-Tooling Mistake Caught & Fixed
 
 **The Dockerfile Missing-COPY Silent Failure:**
-- *How it was found:* Running `scripts/docker_context_check.py --run`, which copies strictly the files declared in the Dockerfile `COPY` instructions into an isolated temporary directory and executes `entrypoint.py` on `data/dev_notes.jsonl`.
-- *The bug:* `pipeline.py` imported `llm_reranker`, but `Dockerfile` omitted `COPY llm_reranker.py .`. In the local workspace where both files existed, tests passed. In the isolated container build, the missing file threw an `ImportError` on worker startup, causing `entrypoint.py` to silently catch the exception and fall back to the constant default `["1F40.Z", "CA40.Z", "1A07.Z"]` for all 60 notes.
-- *The fix:* Completely removed all LLM dependencies and code. Added `STRICT=1` environment mode to fail loudly on unhandled errors, and added dynamic per-note BM25 fallback in `entrypoint.py` so constant fallback predictions are never emitted.
+- *How it was found:* Caught during an architectural review when verifying container build reproducibility and auditing the Dockerfile against imported modules.
+- *The bug:* `pipeline.py` imported an LLM reranker helper, but `Dockerfile` omitted `COPY llm_reranker.py .`. In the local dev tree where all files were present, tests ran fine. In an isolated container build, the missing file threw an `ImportError` on worker startup, causing `entrypoint.py` to catch the exception and silently fall back to a hardcoded constant list for all notes.
+- *The fix & prevention:* Completely removed all LLM dependencies and code. Wrote `scripts/docker_context_check.py` *afterwards* to statically verify that every imported `.py` module is present in the Dockerfile `COPY` directives and to execute a sandbox runtime test with `STRICT=1` so that any missing dependency fails loudly at build/test time. Eliminated all constant fallback paths in `entrypoint.py` (failing loudly via `sys.exit(1)` instead).
 
 ---
 
