@@ -150,12 +150,19 @@ class AssertionFilter:
 
     def check_clause_assertion(self, clause: str) -> Dict[str, bool]:
         """Check status of a single clause."""
-        is_misdiag = bool(RE_MISDIAG.search(clause))
-        is_family = bool(RE_FAMILY.search(clause))
-        is_comorbidity = bool(RE_COMORBIDITY.search(clause))
-        is_history = bool(RE_HISTORY.search(clause))
-        is_ruled_out = bool(RE_RULED_OUT.search(clause))
-        is_negated = bool(RE_PRE_NEG.search(clause) or RE_POST_NEG.search(clause))
+        # In clinical grammar, 'X without Y' (e.g. 'migraine without aura', 'asthma without complication')
+        # affirms disease X while specifying the absence of complication Y.
+        # Strip trailing 'without ...' to evaluate assertion of the primary condition X.
+        clean_clause = re.sub(r"\bwithout\b.*$", "", clause, flags=re.IGNORECASE).strip()
+        if not clean_clause:
+            clean_clause = clause
+
+        is_misdiag = bool(RE_MISDIAG.search(clean_clause))
+        is_family = bool(RE_FAMILY.search(clean_clause))
+        is_comorbidity = bool(RE_COMORBIDITY.search(clean_clause))
+        is_history = bool(RE_HISTORY.search(clean_clause))
+        is_ruled_out = bool(RE_RULED_OUT.search(clean_clause))
+        is_negated = bool(RE_PRE_NEG.search(clean_clause) or RE_POST_NEG.search(clean_clause))
 
         return {
             "negated": is_negated,
@@ -216,6 +223,13 @@ class AssertionFilter:
             # Check if substantive disease terms appear with word boundary
             matched = [w for w in words if re.search(r"\b" + re.escape(w) + r"\b", clause_lower)]
             if matched:
+                # If all matched words appeared before 'without' in this clause (e.g. 'migraine' in 'migraine without aura'),
+                # the candidate condition is being qualified, not negated
+                if "without" in clause_lower:
+                    without_pos = clause_lower.find("without")
+                    all_before = all(re.search(r"\b" + re.escape(w) + r"\b", clause_lower[:without_pos]) for w in matched)
+                    if all_before:
+                        continue
                 assertion = self.check_clause_assertion(clause)
                 if assertion["negated"] or assertion["misdiagnosis"]:
                     return True

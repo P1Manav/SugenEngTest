@@ -6,6 +6,7 @@ import re
 from typing import Any
 
 from clinical_concepts import extract_clinical_qualifiers
+from icd_hierarchy import CLINICAL_QUALIFIER_EQUIVALENTS
 from text_utils import tokenize
 
 
@@ -50,8 +51,10 @@ class RuleReranker:
             phrase_lower = phrase.lower().strip()
             if not phrase_lower:
                 continue
-            if title in phrase_lower or phrase_lower in title:
-                score += 0.06
+            phrase_clean = " ".join(dict.fromkeys(phrase_lower.split()))
+            if title in phrase_lower or phrase_lower in title or phrase_clean in title or title in phrase_clean:
+                num_substantive = len([w for w in title.split() if w not in {"due", "with", "and", "the", "for", "other", "specified", "unspecified", "from", "to", "in", "of", "by"} and len(w) > 2])
+                score += 0.06 + min(0.04, 0.015 * max(0, num_substantive - 1))
                 matched_synonym = True
                 if not is_residual:
                     matched_specific = True
@@ -67,12 +70,18 @@ class RuleReranker:
                 if len(syn_lower) < 4:
                     continue
 
-                # Extract aliases: stripped brackets [xyz] or dash separations
+                # Extract aliases: stripped brackets [xyz], stripped NOS, or dash separations
                 bracketed = re.findall(r"\[(.*?)\]|\((.*?)\)", syn_lower)
                 aliases = [syn_lower]
                 clean_syn = re.sub(r"\[.*?\]|\(.*?\)", "", syn_lower).strip()
                 if clean_syn and clean_syn != syn_lower and len(clean_syn) >= 4:
                     aliases.append(clean_syn)
+                clean_nos = re.sub(r"\bnos\b", "", syn_lower).strip()
+                if clean_nos and clean_nos != syn_lower and len(clean_nos) >= 4:
+                    aliases.append(clean_nos)
+                clean_both = re.sub(r"\bnos\b", "", clean_syn).strip()
+                if clean_both and clean_both not in aliases and len(clean_both) >= 4:
+                    aliases.append(clean_both)
                 for b in bracketed:
                     for item in b:
                         if item and len(item.strip()) >= 3:
@@ -107,7 +116,9 @@ class RuleReranker:
                         break
 
                 if syn_hit:
-                    score += 0.065
+                    num_substantive = len([w for w in term.split() if w not in GENERIC_STOP and len(w) > 2])
+                    syn_bonus = 0.065 + min(0.04, 0.015 * max(0, num_substantive - 1))
+                    score += syn_bonus
                     matched_synonym = True
                     if not is_residual:
                         matched_specific = True
@@ -139,35 +150,61 @@ class RuleReranker:
             distinguishing = title_tokens - parent_toks - GENERIC_STOP - GENERIC_MODIFIERS - GENERIC_BODY_SYSTEMS
             if distinguishing:
                 has_dist_support = False
-                for dt in distinguishing:
-                    if dt in note_lower or (dt.endswith("s") and dt[:-1] in note_lower) or ((dt + "s") in note_lower):
+                # 1. Check concept equivalents across compound title that distinguish child from parent
+                for concept, eqs in CLINICAL_QUALIFIER_EQUIVALENTS.items():
+                    if parent_title and (concept in parent_title or concept.replace("-", " ") in parent_title):
+                        continue
+                    if concept in title or concept.replace("-", " ") in title:
+                        if any(re.search(r"\b" + re.escape(eq) + r"\b", note_lower) for eq in eqs + [concept]):
+                            has_dist_support = True
+                            break
+
+                if not has_dist_support:
+                    for dt in distinguishing:
+                        if dt in note_lower or (dt.endswith("s") and dt[:-1] in note_lower) or ((dt + "s") in note_lower):
+                            has_dist_support = True
+                            break
+                        # Check dictionary equivalents
+                        eqs = CLINICAL_QUALIFIER_EQUIVALENTS.get(dt, [])
+                        if any(eq in note_lower for eq in eqs):
+                            has_dist_support = True
+                            break
+                        # Clinical equivalents
+                        if dt in ("infectious", "infective") and any(inf in note_lower for inf in ["infection", "infective", "infectious", "infecciosa", "infeccioso", "infectieuse", "infectieux", "maambukizi", "uti", "bacterial", "viral"]):
+                            has_dist_support = True
+                            break
+                        if dt == "food" and any(fd in note_lower for fd in ["peanut", "groundnut", "nut", "biscuit", "egg", "milk", "fish", "wheat", "food"]):
+                            has_dist_support = True
+                            break
+                        if dt.startswith("allerg") and any(al in note_lower for al in ["allerg", "atopic", "atopique", "alérgic"]):
+                            has_dist_support = True
+                            break
+                        if dt == "bladder" and any(bl in note_lower for bl in ["cystitis", "bladder", "mkojo", "vejiga", "vessie"]):
+                            has_dist_support = True
+                            break
+                        if dt == "arising" and any(ar in note_lower for ar in ["pregnancy", "gestational", "come with", "developing", "gestante", "grossesse"]):
+                            has_dist_support = True
+                            break
+                        if dt in ("systolic", "diastolic", "combined") and re.search(r"\b(1[4-9]\d|[2-9]\d\d)\s*/\s*(9\d|1\d\d)\b", note_lower):
+                            has_dist_support = True
+                            break
+                        if dt in ("adult", "adults"):
+                            # Only support adult if note does not indicate pediatric patient
+                            is_ped = any(ped in note_lower for ped in ["child", "infant", "paed", "pediatric", "girl", "boy", "son", "daughter"])
+                            ped_age = re.search(r"\b([1-9]|1[0-7])\s*(?:yo|y/o|yr|yrs|year|ans|años|anos|miaka|岁)\b", note_lower)
+                            if not is_ped and not ped_age:
+                                has_dist_support = True
+                                break
+                        if dt == "acquired" and any(acq in note_lower for acq in ["acquired", "adult-onset", "post-surgical", "secundaria", "secondaire"]):
+                            has_dist_support = True
+                            break
+                        if dt in ("closed", "simple") and any(cl in note_lower for cl in ["closed", "simple", "fermee", "fermée", "cerrada"]):
+                            has_dist_support = True
+                            break
+                # Negative qualifiers: "without [complication]", "uncomplicated", etc.
+                if not has_dist_support:
+                    if any(w_neg in title for w_neg in ["without", "uncomplicated", "no mention"]):
                         has_dist_support = True
-                        break
-                    # Clinical equivalents
-                    if dt == "food" and any(fd in note_lower for fd in ["peanut", "groundnut", "nut", "biscuit", "egg", "milk", "fish", "wheat", "food"]):
-                        has_dist_support = True
-                        break
-                    if dt.startswith("allerg") and "allerg" in note_lower:
-                        has_dist_support = True
-                        break
-                    if dt == "bladder" and "cystitis" in note_lower:
-                        has_dist_support = True
-                        break
-                    if dt == "arising" and any(ar in note_lower for ar in ["pregnancy", "gestational", "come with", "developing"]):
-                        has_dist_support = True
-                        break
-                    if dt in ("systolic", "diastolic", "combined") and re.search(r"\b(1[4-9]\d|[2-9]\d\d)\s*/\s*(9\d|1\d\d)\b", note_lower):
-                        has_dist_support = True
-                        break
-                    if dt in ("adult", "adults") and not any(ped in note_lower for ped in ["child", "infant", "paed", "pediatric"]):
-                        has_dist_support = True
-                        break
-                    if dt == "acquired" and (any(acq in note_lower for acq in ["primary", "adult", "hashimoto"]) or not any(cong in note_lower for cong in ["congenital", "infant", "child"])):
-                        has_dist_support = True
-                        break
-                # Negative qualifiers: "without coma", "without complication", "without mention of"
-                if not has_dist_support and any(w_neg in title for w_neg in ["without coma", "without complication", "without mention"]):
-                    has_dist_support = True
 
                 if not has_dist_support:
                     # Candidate has distinguishing qualifiers that are absent from clinical note
@@ -184,7 +221,7 @@ class RuleReranker:
         # 4. Chapter 21 (Symptoms and signs) demotion when definitive disease is present
         chapter = info.get("chapter", "")
         if chapter == "21" or code.startswith("M"):
-            score -= 0.05
+            score -= 0.20
 
         # Traditional medicine (Chapter 26) demotion only if no traditional medicine terms in note
         if chapter == "26" or code.startswith("S"):
@@ -195,6 +232,24 @@ class RuleReranker:
         if chapter == "20" or code.startswith("LD"):
             if not any(g in note_lower for g in ["syndrome", "genetic", "congenital", "anomaly", "malformation", "dysmorphic", "trisomy", "chromosom"]):
                 score -= 0.08
+
+        # Manifestation vs etiology check:
+        # For codes with 'X due to Y' (e.g. 'Chorea due to SLE', 'Syncope due to autonomic failure'),
+        # BOTH manifestation X and cause Y must be documented in the note.
+        if " due to " in title:
+            parts = title.split(" due to ")
+            x_part, y_part = parts[0].strip(), parts[1].strip()
+            x_words = [w for w in re.findall(r"\b[a-z]{4,}\b", x_part) if w not in GENERIC_STOP and w not in GENERIC_MODIFIERS]
+            y_words = [w for w in re.findall(r"\b[a-z]{4,}\b", y_part) if w not in GENERIC_STOP and w not in GENERIC_MODIFIERS]
+            x_miss = x_words and not any(mw in note_lower for mw in x_words)
+            y_miss = y_words and not any(mw in note_lower for mw in y_words)
+            if x_miss or y_miss:
+                score -= 0.30
+        elif " in " in title and any(term in title for term in ["dementia", "retinopathy", "nephropathy", "neuropathy"]):
+            manifestation = title.split(" in ")[0].strip()
+            m_words = [w for w in re.findall(r"\b[a-z]{4,}\b", manifestation) if w not in GENERIC_STOP and w not in GENERIC_MODIFIERS]
+            if m_words and not any(mw in note_lower for mw in m_words):
+                score -= 0.30
 
         # 5. Demote .Y (Other specified) codes relative to .Z (Unspecified)
         if is_other_specified:
@@ -208,6 +263,9 @@ class RuleReranker:
         ]
         for term in critical_mismatch:
             if term in title and term not in note_lower:
+                # If term is preceded by "without", it defines the absence of the complication, not a mismatch
+                if re.search(r"\bwithout\b.*?\b" + re.escape(term) + r"\b", title):
+                    continue
                 score -= 0.06
 
         # 7. Biological sex consistency checks (multilingual support)
@@ -243,11 +301,21 @@ class RuleReranker:
                     score += 0.06
 
         # 9. Pregnancy & obstetric consistency (multilingual support)
-        is_pregnant = bool(re.search(r"\b(anc\b|antenatal|pregnant|pregnancy|gestation|trimester|fundal|fhr|edd|g\d+p\d+|\d+/\d+\s*weeks?|enceinte|grossesse|embarazada|embarazo|gravidez|gestante|ujauzito|mimba)\b", note_text, re.IGNORECASE))
-        is_not_pregnant = bool(re.search(r"\b(upt\s*neg|pregnancy\s*test\s*neg|not\s*pregnant)\b", note_text, re.IGNORECASE))
-        if is_not_pregnant:
+        is_neonate = bool(re.search(r"\b(newborn|neonate|infant|nouveau-n[eé]|mtoto\s+mchanga|reci[eé]n\s+nacido)\b", note_text, re.IGNORECASE))
+        if is_neonate:
             if chapter == "18" or code.startswith(("JA", "JB")):
                 score -= 0.40
+            elif chapter == "19" or code.startswith("KA") or "fetus or newborn" in title:
+                score += 0.15
+
+        is_pregnant = bool(re.search(r"\b(anc\b|antenatal|pregnant|pregnancy|gestation|trimester|fundal|fhr|edd|g\d+p\d+|\d+/\d+\s*weeks?|enceinte|grossesse|embarazada|embarazo|gravidez|gestante|ujauzito|mimba)\b", note_text, re.IGNORECASE))
+        is_not_pregnant = bool(re.search(r"\b(upt\s*neg|pregnancy\s*test\s*neg|not\s*pregnant)\b", note_text, re.IGNORECASE))
+        if is_not_pregnant or (age is not None and age >= 50 and not is_pregnant):
+            if chapter == "18" or code.startswith(("JA", "JB")):
+                score -= 0.40
+        elif not is_pregnant:
+            if chapter == "18" or code.startswith(("JA", "JB")):
+                score -= 0.35
         elif is_pregnant:
             # In pregnancy, obstetric chapter conditions take precedence
             if chapter == "18" or code.startswith(("JA", "JB")) or "pregnancy" in title or "maternal" in title:
@@ -306,11 +374,11 @@ class RuleReranker:
                 score += 0.08
 
         # 17. Active clinical concept qualifiers
-        active_qualifiers = extract_clinical_qualifiers(note_text)
-        for q in active_qualifiers:
-            if q in title:
-                score += 0.06
-                break
+        for concept, eqs in CLINICAL_QUALIFIER_EQUIVALENTS.items():
+            if concept in title or concept.replace("-", " ") in title:
+                if any(re.search(r"\b" + re.escape(eq) + r"\b", note_lower) for eq in eqs + [concept]):
+                    score += 0.05
+                    break
 
         # 18. Bacteriologically confirmed alignment
         if "confirmed" in note_lower and "confirmed" in title:

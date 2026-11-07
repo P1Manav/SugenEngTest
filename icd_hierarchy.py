@@ -33,9 +33,14 @@ CLINICAL_QUALIFIER_EQUIVALENTS: dict[str, list[str]] = {
     "left": ["left", "lt", "l side"],
     "complication": ["complication", "complications"],
     "facial": ["facial", "face", "mandible", "jaw"],
-    "confirmed": ["confirmed", "positive", "bacteriologically", "smear", "baar", "culture", "biopsy", "histologically", "histology", "chanya", "positif", "confirmado", "confirmada", "pcr"],
-    "unconfirmed": ["unconfirmed", "suspected", "presumed", "probable", "clinically diagnosed", "without confirmation"],
-    "crisis": ["crisis", "crise", "vaso-occlusive", "painful", "acute chest", "sequestration", "maumivu makali"],
+    "confirmed": ["confirmed", "confirmée", "confirmee", "confirmé", "confirme", "confirmada", "confirmado", "positive", "positif", "positiva", "positivo", "bacteriologically", "smear", "baar", "culture", "biopsy", "histologically", "histology", "chanya", "pcr", "laboratory confirmed"],
+    "unconfirmed": ["unconfirmed", "suspected", "presumed", "probable", "clinically diagnosed", "without confirmation", "non confirmé", "no confirmado", "hasi"],
+    "infectious": ["infectious", "infection", "infective", "bacterial", "viral", "microbial", "pathogen", "uti", "maambukizi", "infecciosa", "infeccioso", "infeccion", "infección", "infectieuse", "infectieux", "purulent", "pus"],
+    "uncomplicated": ["uncomplicated", "without complication", "no complication", "no complications", "without peritonitis", "no peritonitis", "without warning signs", "no warning signs", "non-severe", "sans complication", "sin complicaciones", "bila matatizo"],
+    "non-erosive": ["non-erosive", "nerd", "reflux", "gerd", "erge", "rgo", "no erosiva", "não erosiva", "nao erosiva", "sin erosiones", "sem lesões", "ausência de lesões", "sans érosion", "sans erosion", "oesophagitis", "esofagitis"],
+    "age-related": ["age-related", "senile", "elderly", "aged", "sénile", "senil", "mzee", "old age", "70", "72", "75", "80", "85"],
+    "paroxysmal": ["paroxysmal", "paroxystique", "paroxística", "episodic"],
+    "crisis": ["crisis", "crise", "vaso-occlusive", "painful", "acute chest", "sequestration", "maumivu makali", "mgogoro"],
     "bacterial": ["bacterial", "purulent", "pus", "crust", "crusting", "mucopurulent", "bactérienne", "bacteriana"],
     "viral": ["viral", "watery", "clear discharge", "adenovirus", "virale"],
     "allergic": ["allergic", "allergy", "itching", "atopic", "atopique", "alérgica", "alergica"],
@@ -46,6 +51,12 @@ CLINICAL_QUALIFIER_EQUIVALENTS: dict[str, list[str]] = {
     "autoimmune": ["autoimmune", "hashimoto", "primary", "primitive", "primario", "primaria"],
     "single": ["single", "first", "premier", "primer", "primera"],
     "recurrent": ["recurrent", "relapsing", "récidivant", "recurrente"],
+    "classical": ["classical", "typical", "burrows", "surcos", "surco", "acarianos", "interdigital", "hands", "wrists", "nocturnal pruritus", "prurito nocturno", "sarna clásica", "sarna clasica"],
+    "without severe features": ["without severe features", "sin criterios de gravedad", "non-severe", "mild preeclampsia"],
+    "without aura": ["without aura", "sans aura", "sin aura", "بدون أورة", "دون وجود أورة", "no aura"],
+    "ureter": ["ureter", "ureteral", "uréter", "uretere", "urétéro", "uretero"],
+    "kidney": ["kidney", "renal", "rein", "riñón", "rinon", "rim"],
+    "hypertensive": ["hypertensive", "hypertension", "hta", "high blood pressure", "presha", "gravidique"],
 }
 
 STOP_WORDS = {
@@ -229,20 +240,70 @@ class ICDHierarchy:
                         score += 10
                         break
 
-            # 2. General complication alignment
+            # 2. General complication and negative modifier alignment
             title_lower = ch_info.get("title", "").lower()
             if "without complication" in title_lower or "uncomplicated" in title_lower:
-                if any(phrase in text_lower for phrase in ["no complication", "no complications", "uncomplicated", "without complication"]):
-                    score += 15
+                if any(phrase in text_lower for phrase in ["no complication", "no complications", "uncomplicated", "without complication", "sans complication", "sin complicaciones", "bila matatizo"]):
+                    score += 18
                 elif not any(comp in text_lower for comp in ["orchitis", "meningitis", "pancreatitis", "encephalitis", "abscess", "perforation", "severe", "failure"]):
                     score += 12
                 else:
                     score -= 10
             elif "with complication" in title_lower:
                 if any(comp in text_lower for comp in ["complication", "orchitis", "meningitis", "pancreatitis", "encephalitis", "abscess", "perforation", "severe"]):
-                    score += 15
+                    score += 18
                 elif any(phrase in text_lower for phrase in ["no complication", "no complications", "uncomplicated", "without complication"]):
                     score -= 15
+
+            # Uncomplicated acute appendicitis without peritonitis (DB10.02)
+            if "without localised or generalised peritonitis" in title_lower or "without peritonitis" in title_lower:
+                if any(p in text_lower for p in ["without peritonitis", "no peritonitis", "sin peritonitis", "sans peritonite"]):
+                    score += 20
+                elif not any(p in text_lower for p in ["generalised peritonitis", "localised peritonitis", "peritonitis", "perforated", "perforation", "abscess"]):
+                    score += 15
+                else:
+                    score -= 10
+            elif "with generalised peritonitis" in title_lower or "with localised peritonitis" in title_lower:
+                if any(p in text_lower for p in ["peritonitis", "perforated", "perforation", "abscess"]):
+                    score += 18
+                else:
+                    score -= 15
+
+            # Dengue without warning signs (1D20)
+            if "without warning signs" in title_lower:
+                if any(p in text_lower for p in ["without warning", "no warning", "sin signos de alarma", "sans signe d'alerte"]):
+                    score += 20
+                elif not any(p in text_lower for p in ["warning signs", "severe dengue", "bleeding", "haemorrhag", "shock", "plasma leakage"]):
+                    score += 15
+                else:
+                    score -= 10
+            elif "with warning signs" in title_lower or "severe dengue" in title_lower:
+                if any(p in text_lower for p in ["warning signs", "severe dengue", "bleeding", "haemorrhag", "shock", "plasma leakage"]):
+                    score += 18
+                else:
+                    score -= 15
+
+            # Confirmed vs Unconfirmed tuberculosis (1B10.0 vs 1B10.1)
+            if "confirmed" in title_lower and not ("unconfirmed" in title_lower or "without confirmation" in title_lower):
+                if any(p in text_lower for p in ["confirmed", "confirmée", "confirmee", "confirmé", "confirme", "confirmada", "confirmado", "chanya", "positive", "positif", "smear", "culture", "pcr", "baar", "biopsy"]):
+                    score += 20
+                else:
+                    score -= 5
+            elif "unconfirmed" in title_lower or "without confirmation" in title_lower:
+                if any(p in text_lower for p in ["unconfirmed", "suspected", "presumed", "clinically diagnosed", "without confirmation"]):
+                    score += 20
+
+            # Psychotic features alignment (e.g. depression with/without psychotic symptoms)
+            if "without psychotic symptoms" in title_lower or "without psychotic" in title_lower:
+                if any(p in text_lower for p in ["no psychotic", "without psychotic", "sin sintomas psicoticos", "sans symptome psychotique"]):
+                    score += 25
+                elif not any(p in text_lower for p in ["psychotic", "delusion", "hallucination", "psicosis", "psychose"]):
+                    score += 15
+            elif "with psychotic symptoms" in title_lower or "with psychotic" in title_lower:
+                if any(p in text_lower for p in ["no psychotic", "without psychotic", "sin sintomas psicoticos", "sans symptome psychotique"]):
+                    score -= 25
+                elif any(p in text_lower for p in ["delusion", "hallucination", "psychotic features"]):
+                    score += 25
 
             # 3. Clinical concept qualifier matching against child title, synonyms, and inclusions
             ch_terms = [title_lower] + [s.lower() for s in synonyms]
@@ -251,8 +312,19 @@ class ICDHierarchy:
                     score += 18
                     break
 
+            # 3b. Concept dictionary matching across CLINICAL_QUALIFIER_EQUIVALENTS
+            parent_code = ch_info.get("parent")
+            p_title = self.kb[parent_code].get("title", "").lower() if parent_code and parent_code in self.kb else ""
+            for concept, eqs in CLINICAL_QUALIFIER_EQUIVALENTS.items():
+                if p_title and (concept in p_title or concept.replace("-", " ") in p_title):
+                    continue
+                if concept in title_lower or concept.replace("-", " ") in title_lower:
+                    if any(re.search(r"\b" + re.escape(eq) + r"\b", text_lower) for eq in eqs + [concept]):
+                        score += 20
+                        break
+
             # 4. Qualifier-differential token matching between child and siblings/parent
-            words = set(re.findall(r"\b[a-z0-9]{3,}\b", title_lower)) - STOP_WORDS
+            words = set(re.findall(r"\b[a-z0-9]+(?:-[a-z0-9]+)*\b", title_lower)) - STOP_WORDS
             if not words and score == 0:
                 continue
 
@@ -260,7 +332,7 @@ class ICDHierarchy:
             parent_words = set()
             if parent_code and parent_code in self.kb:
                 p_title = self.kb[parent_code].get("title", "").lower()
-                parent_words = set(re.findall(r"\b[a-z0-9]{3,}\b", p_title))
+                parent_words = set(re.findall(r"\b[a-z0-9]+(?:-[a-z0-9]+)*\b", p_title))
 
             qualifiers = words - parent_words
             target_words = qualifiers if qualifiers else words

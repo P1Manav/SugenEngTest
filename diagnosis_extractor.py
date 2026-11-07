@@ -10,13 +10,19 @@ from assertion_filter import split_sentences_and_clauses
 
 # Assessment / Impression / Diagnosis line headers (multilingual)
 RE_ASSESSMENT_HEADER = re.compile(
-    r"(?:^|\n|\b)(?:A|Imp|Dx|Diagnosis|Assessment|Impression|D|Diagnóstico|Diagnostico|Diagnostic|Utambuzi)\s*[:\-]\s*(.*?)(?=(?:\n\s*(?:P|Plan|Rx|Mx|Ix|S|O|O/E|R/v|Review|Return|Tratamiento|Traitement|Plano|Mpango)\s*[:\-]|\Z))",
+    r"(?:^|\n|\b)(?:A|Imp|Dx|Diagnosis|Assessment|Impression|D|Diagnóstico|Diagnostico|Diagnostic|Utambuzi|Biópsia|Biopsia|Biopsie|Endoscopia|Endoscopie|Histology|Histopathology|Histopathologie|निदान|डायग्नोसिस|التشخيص|诊断|中医辨证|辨证诊断)\s*[:\-]\s*(.*?)(?=(?:\n\s*(?:P|Plan|Rx|Mx|Ix|S|O|O/E|R/v|Review|Return|Tratamiento|Traitement|Plano|Mpango)\s*[:\-]|\Z))",
     re.IGNORECASE | re.DOTALL,
 )
 
 # Inline diagnosis markers often seen in short consults without clean newlines
 RE_INLINE_DX = re.compile(
-    r"\b(?:Dx|Imp|Impression|Diagnosis|Assessment|Diagnóstico|Diagnostico|Diagnostic|Utambuzi)\b\s*[:\-]?\s*([^\n.;]+)",
+    r"(?:\b(?:Dx|Imp|Impression|Diagnosis|Assessment|Diagnóstico|Diagnostico|Diagnostic|Utambuzi|Biópsia|Biopsia|Biopsie|Endoscopia|Endoscopie|Histology|Histopathology|Histopathologie|निदान|डायग्नोसिस|التشخيص|诊断|中医辨证|辨证诊断)\b\s*[:\-]?\s*([^\n.;]+)|\b(?:诊断|中医辨证|辨证诊断)\s*[:：]\s*([^\n.;]+))",
+    re.IGNORECASE,
+)
+
+# Diagnostic test conclusions (e.g. Biopsy confirms squamous cell carcinoma, X-ray confirms fracture)
+RE_DIAGNOSTIC_TESTS = re.compile(
+    r"\b(?:biopsy|histology|histopathology|cytology|endoscopy|colonoscopy|bronchoscopy|x-ray|xr|ct|mri|ultrasound|uss|echo|culture|smear|pcr|rapid test|antigen test|swab|biopsia|biópsia|biopsie|endoscopie|endoscopia)\s*(?:shows?|reveals?|confirmed?|confirms?|consistent with|reported as|diagnostic of|positive for|showed|revealed|revela|muestra|confirmé|confirme|confirma|mostró)?\s*[:\-]\s*([^\n.;]+)",
     re.IGNORECASE,
 )
 
@@ -88,9 +94,29 @@ class DiagnosisExtractor:
         # 2. Look for inline Dx: or Imp: patterns
         inline_matches = RE_INLINE_DX.findall(text)
         for im in inline_matches:
-            im_clean = clean_text(im)
+            val = im if isinstance(im, str) else next((g for g in im if g), "")
+            im_clean = clean_text(val)
             if im_clean and len(im_clean) > 2 and im_clean not in phrases:
                 phrases.append(im_clean)
+
+        # 3. Look for diagnostic test conclusions (e.g. Biopsy confirms squamous cell carcinoma)
+        test_matches = RE_DIAGNOSTIC_TESTS.findall(text)
+        for tm in test_matches:
+            val = tm if isinstance(tm, str) else next((g for g in tm if g), "")
+            tm_clean = clean_text(val)
+            if tm_clean and len(tm_clean) > 3 and tm_clean not in phrases:
+                phrases.append(tm_clean)
+
+        # 4. Fallback for consults without explicit section headers:
+        # Check closing declarative sentence if it contains a definitive disease statement
+        if not phrases:
+            sentences = [s.strip() for s in re.split(r"[.!?\n]+", text) if s.strip()]
+            if sentences:
+                last_sent = sentences[-1]
+                words = last_sent.split()
+                if 2 <= len(words) <= 15:
+                    if any(t in last_sent.lower() for t in ["disorder", "disease", "syndrome", "fracture", "carcinoma", "neoplasm", "infection", "depression", "anxiety", "malaria", "pneumonia", "asthma", "hypertension", "diabetes", "bronchitis", "cataract", "scabies", "arthritis", "colles", "angina"]):
+                        phrases.append(clean_text(last_sent))
 
         return phrases
 
