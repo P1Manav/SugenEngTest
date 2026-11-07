@@ -364,3 +364,17 @@
 
 **What decided it:** Satisfies P2 accuracy upgrade objectives. All 12 unit tests pass. Merge gate verified.
 
+---
+
+## Entry 21 — 2026-11-07 12:35 IST — Repository Clean-Up, Deprecation Pruning & Pre-Push Verification
+
+**Commit:** `325a7a9`  
+**Task:** 1.2, 6.3  
+**Decision:** Removed redundant root artifact `architecture.txt` (fully consolidated and documented with Mermaid diagrams in `docs/ARCHITECTURE.md`) and legacy scratch script `scripts/analyze_failures.py` (superseded by `scripts/failure_report.py`). Standardized `build_index.py` to produce compressed `.npz` dense embeddings matching `retrieval.py` and git-tracked `kb/dense_embeddings.npz` (26 MB). Cleaned up local untracked cache artifacts. Verified that `public/` and `.env` are strictly protected by `.gitignore`.
+
+**Options considered:**
+1. Keep redundant text architecture and obsolete scripts — causes repository clutter and ambiguous entrypoints.
+2. Remove deprecated files and standardize storage formats — ensures clean, professional repository structure.
+
+**What decided it:** Leaves repository lean, fully self-contained, and compliant with clean-clone execution standards. All verification tests pass.
+
