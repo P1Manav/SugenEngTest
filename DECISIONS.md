@@ -457,5 +457,57 @@
 
 **What decided it:** Confirms that assertion filtering and negation boundaries operate reliably across diverse documentation formats. Brings total unit test suite to 33 passing tests with zero regressions.
 
+---
+
+## Entry 24 — 2026-11-07 16:15 IST — Adversarial Audit Bug Fixes, Multilingual Dense Retrieval Upgrade, and Generalisation Hardening
+
+**Commit:** `2540ab7`  
+**Task:** Adversarial audit, bug remediation, multilingual dense encoder upgrade, and generalisation hardening across all 26 chapters  
+**Decision:** Executed a comprehensive architecture review (`REVIEW.md`) and implemented five structural upgrades to repair generalisation across languages and chapters:
+
+1. **Bug CR-01 Remediation (`icd_hierarchy.py`):**
+   - Added `kb_dict: dict[str, Any] | None = None` parameter to `ICDHierarchy.__init__` so standalone fallback in `entrypoint.py` executes without `TypeError`, ensuring graceful degradation on unexpected runtime exceptions.
+
+2. **Bug CR-02 Remediation (`assertion_filter.py`):**
+   - Excluded generic clinical modifiers (`NON_DIAGNOSTIC_TERMS`: `acute`, `chronic`, `without`, `other`, `specified`, `unspecified`, `primary`, `disease`, `infection`, etc.) from candidate disease word checking.
+   - Enforced regex word boundaries `\b` so standard exam findings like `"no acute distress"` or `"walking without assistance"` no longer falsely negate `Acute bronchitis` or conditions classified as `without complication`.
+
+3. **Bug CR-03 Remediation (`text_utils.py`):**
+   - Removed destructive abbreviation collisions (`\bal\b` expanding to Artemether-Lumefantrine Coartem, which corrupted Spanish prepositions like "al examen físico" into malaria; removed `\bage\b`, `\bt\b`, `\bra\b`, `\bl\b`, `\br\b`).
+   - Refined `PE:` SOAP header matching to expand to `"Physical Examination:"` only when followed by colon, avoiding false pulmonary embolism substitutions.
+
+4. **WR-01 & Multilingual Dense Retrieval Upgrade (`retrieval.py`, `build_index.py`, `pipeline.py`):**
+   - Replaced English-only `all-MiniLM-L6-v2` with `paraphrase-multilingual-MiniLM-L12-v2` (50+ languages, 384 dimensions).
+   - Recomputed precomputed dense embeddings (`kb/dense_embeddings.npz`, 24.94 MB) across all 18,375 MMS categories.
+   - To respect GitHub's 100 MB single-file limit without Git LFS, sharded `model.safetensors` into 5 chunks (`part0` through `part4`, each <= 90 MB) and implemented `ensure_safetensors` in `retrieval.py` and `build_index.py` for automatic dynamic reassembly.
+   - Added expanded clinical dictionary mappings in `multilingual.py` for Spanish, French, Portuguese, Swahili, Hindi, Arabic, and Chinese.
+
+5. **WR-02, WR-03, WR-04 Demographics & Reranker Upgrades (`reranker.py`, `diagnosis_extractor.py`, `icd_hierarchy.py`):**
+   - Removed blanket `-0.35` flat demotion penalties against Chapter 26 (Traditional Medicine) and Chapter 20 (Developmental anomalies), replacing them with content-aware relevance checks.
+   - Added multilingual demographic extraction for sex (`homme`, `femme`, `hombre`, `mujer`, `kiume`, `mwanamke`), age (`ans`, `años`, `anos`, `miaka`), and pregnancy (`enceinte`, `grossesse`, `embarazada`, `embarazo`, `gravidez`, `ujauzito`, `mimba`).
+   - Added multilingual doctor speaker detection (`Médecin:`, `Médico:`, `Daktari:`) and assessment headers (`Diagnóstico:`, `Diagnostic:`, `Utambuzi:`) in `diagnosis_extractor.py`.
+   - Expanded distinguishing clinical qualifiers in `icd_hierarchy.py` (`confirmed`, `crisis`, `bacterial`, `viral`, `allergic`, `mild`, `moderate`, `severe`, `invasive`, `autoimmune`).
+
+**Measured Results:**
+- **Dev Notes (`data/dev_notes.jsonl`, 60 notes):**
+  - Top-1 Accuracy: **81.67%** (49/60)
+  - Top-3 Accuracy: **90.00%** (54/60)
+  - Official Grader Score: **63.33 / 75.0** (Normalized: **84.44 / 100**)
+- **Held-Out Generalisation Benchmark (`data/held_out_notes.jsonl`, 85 notes across 26 chapters & 8 languages):**
+  - Top-1 Accuracy: **41.18%** (up from baseline 36.47%)
+  - Top-3 Accuracy: **56.47%** (up from baseline 48.24%)
+  - Spanish Top-3 Accuracy: **61.5%** (jumped from 7.7%)
+  - Swahili Top-3 Accuracy: **53.8%** (jumped from 38.5%)
+  - English Top-3 Accuracy: **85.7%** (up from 78.5%)
+  - Official Score: **34.71 / 75.0** (up from baseline 30.29 / 75.0)
+- **Docker Context Check (`scripts/docker_context_check.py --run`):**
+  - 100% PASS in isolated sandbox container context: `notes=60 errors=0 constant_fallback=0 Score=63.3/75`.
+- **Latency & Throughput:**
+  - Mean latency: 504.5 ms/note; P95: 785.8 ms/note.
+  - Projected 600-note runtime: ~300 seconds (~5.0 minutes, well within 25 min benchmark and 60 min hard limit).
+
+**What decided it:** Direct elimination of language-blind retrieval collapse, false negation purges, and destructive abbreviation expansions. Elevates generalisation performance across all 26 chapters while maintaining > 84/100 on dev notes under 100% offline, zero-LLM constraints.
+
+
 
 
