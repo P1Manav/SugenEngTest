@@ -508,6 +508,44 @@
 
 **What decided it:** Direct elimination of language-blind retrieval collapse, false negation purges, and destructive abbreviation expansions. Elevates generalisation performance across all 26 chapters while maintaining > 84/100 on dev notes under 100% offline, zero-LLM constraints.
 
+---
+
+## Entry 25 — 2026-11-07 17:03 IST — Delivery Safety, Build-Time Model Download, Consistency Guard, and Honesty Pass
+
+**Commit:** `7bdbb30`  
+**Task:** Delivery safety, build-time model download with pinned revision and SHA-256 verification, embedding consistency guard, removal of internal review artifacts, dual-query multilingual retrieval, and honest derivation of the 600-note estimate.  
+**Decision:** Executed delivery safety and honest calibration:
+1. **Model Delivery & Git Cleanliness:**
+   - Ceased vendoring binary model weights in git tracking. Removed `models/` from git index and added `models/` to `.gitignore`.
+   - Created `scripts/download_models.py` (executed via `RUN` in `Dockerfile`), downloading `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` at pinned git revision `e8f8c211226b894fcb81acc59f3b34ba3efd5f42`.
+   - Added cryptographic integrity validation verifying `model.safetensors` against SHA-256 `7f4f89d628f87ade0e0b57c40affb6402cd77abc8110584d8d35dc86da514ee8`.
+   - Removed unused `all-MiniLM-L6-v2` and deprecated `ensure_safetensors` multi-part reassembly logic.
+2. **Embedding Consistency Guard:**
+   - Stored model metadata (`model_id`, `revision`, `embedding_dim`, `codes_checksum`) inside `kb/dense_embeddings.npz` and updated `build_index.py`.
+   - In `retrieval.py` (`DenseRetriever.__init__`), asserted metadata fields on load: fails loudly with `RuntimeError` under `STRICT=1`, or logs `[WARN]` to stderr and degrades safely to BM25 otherwise.
+   - Added unit test `tests/test_embedding_consistency.py` that verifies metadata and re-encodes 20 random codes' search text with `SentenceTransformer`, checking cosine similarity > 0.99 against stored vectors (verified 100% pass, actual cosines 0.99999–1.0).
+3. **Repository Cleanup:**
+   - Removed internal `REVIEW.md` from repository.
+   - Removed unused `onnxruntime==1.31.1` from `requirements.txt`.
+4. **Dual-Query Dense Retrieval for Multilingual Notes:**
+   - In `retrieval.py` and `pipeline.py`, passed original native non-English text directly to the multilingual dense retriever alongside translated queries, enabling native terminology to match the multilingual semantic space.
+   - Evaluated on `data/held_out_notes.jsonl` (85 notes across 26 chapters): Top-3 increased to 57.65% (49/85) and score increased to 35.0 / 75.0, with zero degradation on dev notes (stable at 63.33 / 75.0).
+5. **Honesty & README Calibration:**
+   - Unified all documentation (`README.md`, `docs/ABLATION_TABLE.md`, `docs/FAILURE_REPORT.md`, `docs/baseline_failure_report.txt`) on the canonical dev run: Top-1 81.67% (49/60), Top-3 90.00% (54/60), Score: 63.33 / 75.0 (84.44 / 100).
+   - Removed speculative 68–81/100 estimate; derived 600-note estimate explicitly from Core Slice (~51–59 / 75, with 10–15% overfit deduction) + Generalisation Slice (~9.5–13.5 / 25, calibrated on held-out notes) -> **~60.5–72.5 / 100 points** (with wide bootstrap uncertainty).
+   - Set `Hours spent: <ask me>` as instructed.
+6. **Git Bundle & Delivery Options:**
+   - Measured `git count-objects -vH` (556.34 MiB) and `git bundle create test.bundle --all` (~551.86 MB).
+   - Because git history retains past blobs and history rewriting is strictly prohibited, drafted a clear email for Sugen offering cloud link / private repository / shallow bundle options.
+
+**Measured Results:**
+- Unit Tests: 35/35 passing (`tests/test_embedding_consistency.py` included)
+- Ruff Linter: 100% clean
+- `docker_context_check.py --run`: 100% PASS (60/60 notes, 0 errors, 0 fallbacks, 63.33 / 75.0 score)
+- Dev Notes: 63.33 / 75.0 (Top-1 81.67%, Top-3 90.00%, Recall@50 100.0%)
+- Held-Out Notes: 35.0 / 75.0 (Top-1 41.18%, Top-3 57.65%)
+
+
 
 
 
