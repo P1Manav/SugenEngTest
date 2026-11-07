@@ -255,8 +255,19 @@
 1. Bloated multi-page README — obscures critical evaluation and setup instructions.
 2. Concise one-page README with detailed architectural deep-dive in `docs/ARCHITECTURE.md`.
 
-**What decided it:** Split detailed diagrams and module breakdown to `docs/ARCHITECTURE.md`.
-1. Generic architecture summary — leaves ambiguous how the optional LLM stage interacts with the offline baseline.
-2. Complete end-to-end documentation — provides exact reproduction commands, verified metrics, and explicit rejection risk defenses.
+**What decided it:** Split detailed diagrams and module breakdown to `docs/ARCHITECTURE.md`. Satisfies P3 requirements 6.3 and 6.4.
 
-**What decided it:** Satisfies P3 requirements 6.3 and 6.4. All documentation verified against the implemented codebase and official grader.
+---
+
+## Entry 18 — 2026-11-07 10:10 IST — Strict NO-LLM Audit Remediation, STRICT Mode & Commit Alignment
+
+**Commit:** `8bfaac1`  
+**Task:** Audit Fixes 1-5  
+**Decision:** Fully completed the strict NO-LLM audit. Deleted `llm_reranker.py`, `tests/test_llm_reranker.py`, the LLM hooks in `pipeline.py`, and `openai`/`anthropic` dependencies in `requirements.txt`. Eliminated constant last-resort fallbacks (`["1F40.Z", "CA40.Z", "1A07.Z"]`) in `entrypoint.py` and `pipeline.py`, replacing them with per-note dynamic BM25 ranking. Added `STRICT=1` environment mode to fail loudly on unhandled errors, hardened `scripts/docker_context_check.py` to run `score.py` in an isolated temp directory replicating Docker context, removed unused fastText model, aligned all historical commit hashes in `DECISIONS.md` to real git commits, and condensed `README.md` to a single page.
+
+**Options considered:**
+1. Retaining inactive LLM stubs — risks build failure or confusion regarding network access. Complete deletion ensures 100% adherence to zero-LLM rules.
+2. Keeping constant fallback on worker crash — masks bugs and produces 0 scores. Per-note dynamic BM25 fallback produces valid, context-appropriate predictions.
+3. Keeping unverified claims in README — rewritten to present honest metrics on dev (44.58 / 75.0) and smoke set (labeled as self-written smoke test).
+
+**What decided it:** Passes `scripts/docker_context_check.py --run` with 0 errors, 0 constant fallbacks, and exact score 44.58 / 75.0. All 9 unit tests pass.
