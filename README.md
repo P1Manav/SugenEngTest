@@ -16,6 +16,8 @@ Evaluated using the exact match grader (`score.py`) against valid leaf categorie
 - **Official Score:** **44.58 / 75.0** (Core slice scale: 50 * Top1 + 25 * Top3)
 - **Missing Predictions:** 0 (100% response rate)
 - **Candidate Recall@30:** 95.0%
+- **Measured Throughput:** 2.37 notes/sec (380.8 ms mean latency per note)
+- **600-Note Benchmark Runtime:** 253.40s (4.22 minutes), using 7.0% of the 60-minute limit (< 25 min guardrail: PASS)
 
 ### Estimated Hidden Score (600 Unseen Notes, 100 Points Total)
 - **Core Slice (450 notes, 75 pts):** Similar clinic distribution and styles as dev. Projected: **~44–48 points**.
