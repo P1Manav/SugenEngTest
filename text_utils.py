@@ -30,7 +30,7 @@ CLINICAL_ABBREVIATIONS = {
     r"\byo\b": "year old",
     r"\by/o\b": "year old",
     r"\bm/o\b": "month old",
-    
+
     # Common diseases / conditions
     r"\buncomplicated\b": "uncomplicated without complication",
     r"\bchickenpox\b": "varicella chickenpox",

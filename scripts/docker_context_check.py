@@ -7,7 +7,14 @@
    the constant last-resort fallback (that is what a broken image silently produces).
 Usage: python scripts/docker_context_check.py [--run]
 """
-import glob, json, os, re, shutil, subprocess, sys, tempfile
+import glob
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(ROOT)
@@ -35,17 +42,17 @@ if "--run" in sys.argv:
                 shutil.copy(clean_p, dst)
         inp = os.path.join(tmp, "in.jsonl")
         with open("data/dev_notes.jsonl", encoding="utf-8") as f, open(inp, "w", encoding="utf-8") as g:
-            for l in f:
-                d = json.loads(l)
+            for raw_line in f:
+                d = json.loads(raw_line)
                 g.write(json.dumps({"id": d["id"], "text": d["text"]}) + "\n")
         out = os.path.join(tmp, "out.jsonl")
         env = os.environ.copy()
         env["STRICT"] = "1"
         r = subprocess.run([sys.executable, "entrypoint.py", inp, out], cwd=tmp, capture_output=True, text=True, env=env)
-        errs = [l for l in r.stderr.splitlines() if "[ERROR]" in l]
+        errs = [err_line for err_line in r.stderr.splitlines() if "[ERROR]" in err_line]
         if r.returncode != 0:
             sys.exit(f"FAIL: entrypoint exited with non-zero code {r.returncode}\n{r.stderr}")
-        preds = [json.loads(l)["codes"] for l in open(out, encoding="utf-8")]
+        preds = [json.loads(out_line)["codes"] for out_line in open(out, encoding="utf-8")]
         const = sum(1 for c in preds if c[:3] == ["1F40.Z", "CA40.Z", "1A07.Z"])
         print(f"notes={len(preds)} errors={len(errs)} constant_fallback={const}")
         if errs or const > 2:

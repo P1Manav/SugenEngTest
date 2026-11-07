@@ -167,6 +167,8 @@ class HybridRetriever:
         primary_query: str,
         fallback_query: str = "",
         top_k: int = 50,
+        use_bm25: bool = True,
+        use_dense: bool = True,
     ) -> list[tuple[str, float]]:
         """Retrieve candidates by querying BM25 and dense with primary and fallback queries."""
         ranked_lists = []
@@ -174,11 +176,12 @@ class HybridRetriever:
 
         # 1. Primary query
         if primary_query and primary_query.strip():
-            bm25_primary = self.bm25_retriever.retrieve(primary_query, top_k=top_k)
-            ranked_lists.append(bm25_primary)
-            weights.append(1.5)
+            if use_bm25:
+                bm25_primary = self.bm25_retriever.retrieve(primary_query, top_k=top_k)
+                ranked_lists.append(bm25_primary)
+                weights.append(1.5)
 
-            if self.dense_available and self.dense_retriever:
+            if use_dense and self.dense_available and self.dense_retriever:
                 try:
                     dense_primary = self.dense_retriever.retrieve(primary_query, top_k=top_k)
                     ranked_lists.append(dense_primary)
@@ -188,11 +191,12 @@ class HybridRetriever:
 
         # 2. Fallback query
         if fallback_query and fallback_query.strip() and fallback_query != primary_query:
-            bm25_fb = self.bm25_retriever.retrieve(fallback_query, top_k=top_k)
-            ranked_lists.append(bm25_fb)
-            weights.append(1.0)
+            if use_bm25:
+                bm25_fb = self.bm25_retriever.retrieve(fallback_query, top_k=top_k)
+                ranked_lists.append(bm25_fb)
+                weights.append(1.0)
 
-            if self.dense_available and self.dense_retriever:
+            if use_dense and self.dense_available and self.dense_retriever:
                 try:
                     dense_fb = self.dense_retriever.retrieve(fallback_query, top_k=top_k)
                     ranked_lists.append(dense_fb)
@@ -201,6 +205,8 @@ class HybridRetriever:
                     sys.stderr.write(f"[WARN] Dense retrieval error on fallback query: {e}\n")
 
         if not ranked_lists:
+            if use_bm25:
+                return self.bm25_retriever.retrieve(primary_query or fallback_query, top_k=top_k)
             return []
 
         return reciprocal_rank_fusion(ranked_lists, weights=weights, k=60, top_k=top_k)

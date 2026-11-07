@@ -1,0 +1,68 @@
+================================================================================
+                ICD-11 PIPELINE FAILURE & DIAGNOSTICS REPORT
+================================================================================
+Notes Evaluated:    60
+Top-1 Accuracy:     32/60 (53.33%)
+Top-3 Accuracy:     43/60 (71.67%)
+Official Grader:    44.58 / 75.0  (Normalized: 59.44 / 100)
+--------------------------------------------------------------------------------
+CANDIDATE RECALL ON GOLD TARGETS:
+  Recall@10:        51/60 (85.00%)
+  Recall@30:        57/60 (95.00%)
+  Recall@50:        58/60 (96.67%)
+--------------------------------------------------------------------------------
+FAILURE CATEGORIZATION TRIAGE (Non-Top-1 Notes):
+  Cat 1 (Retrieval Miss)         :  2 notes (  3.3%)
+  Cat 2 (Reranker Demotion)      :  6 notes ( 10.0%)
+  Cat 3 (Specificity Error)      : 20 notes ( 33.3%)
+--------------------------------------------------------------------------------
+PERFORMANCE BY CLINICAL STYLE:
+  ambient_transcript     : n=15 | Top-1:  9/15 ( 60.0%) | Top-3: 12/15 ( 80.0%)
+  short_consult          : n=16 | Top-1:  8/16 ( 50.0%) | Top-3: 11/16 ( 68.8%)
+  typed_consult          : n=29 | Top-1: 15/29 ( 51.7%) | Top-3: 20/29 ( 69.0%)
+--------------------------------------------------------------------------------
+PERFORMANCE BY ICD-11 CHAPTER:
+  Chapter 01             : n=13 | Top-1:  9/13 ( 69.2%) | Top-3: 10/13 ( 76.9%)
+  Chapter 04             : n= 1 | Top-1:  0/ 1 (  0.0%) | Top-3:  0/ 1 (  0.0%)
+  Chapter 05             : n= 7 | Top-1:  3/ 7 ( 42.9%) | Top-3:  4/ 7 ( 57.1%)
+  Chapter 11             : n= 6 | Top-1:  1/ 6 ( 16.7%) | Top-3:  4/ 6 ( 66.7%)
+  Chapter 12             : n= 7 | Top-1:  3/ 7 ( 42.9%) | Top-3:  7/ 7 (100.0%)
+  Chapter 13             : n= 6 | Top-1:  4/ 6 ( 66.7%) | Top-3:  5/ 6 ( 83.3%)
+  Chapter 14             : n= 3 | Top-1:  2/ 3 ( 66.7%) | Top-3:  3/ 3 (100.0%)
+  Chapter 15             : n= 4 | Top-1:  2/ 4 ( 50.0%) | Top-3:  2/ 4 ( 50.0%)
+  Chapter 16             : n= 7 | Top-1:  5/ 7 ( 71.4%) | Top-3:  5/ 7 ( 71.4%)
+  Chapter 18             : n= 5 | Top-1:  3/ 5 ( 60.0%) | Top-3:  3/ 5 ( 60.0%)
+  Chapter 24             : n= 1 | Top-1:  0/ 1 (  0.0%) | Top-3:  0/ 1 (  0.0%)
+================================================================================
+DETAILED PER-NOTE FAILURE TRIAGE:
+Note ID    | Style            | Gold         | Predicted    | Category                 | Reason
+--------------------------------------------------------------------------------------------------------------
+dev-001    | typed_consult    | 1F40.Z       | 1F42.Z,1F42.0,1F41.Z | Cat 3 (Specificity Error) | Chose wrong specific sibling 1F42.Z instead of 1F40.Z
+dev-003    | ambient_transcript | CA23.30      | MD11.C,MD11.Z,CA23.30 | Cat 2 (Reranker Demotion) | Gold CA23.30 was rank 1 in retrieval, but reranker placed it outside top 3
+dev-009    | typed_consult    | 1B10.0       | 1B13.0,1B13.Z,1B13.Y | Cat 3 (Specificity Error) | Chose wrong specific sibling 1B13.0 instead of 1B10.0
+dev-010    | ambient_transcript | CA03.Z       | CA03.Y,CA03.Z,CA03.0 | Cat 3 (Specificity Error) | Chose specific CA03.Y when unspecified (.Z) CA03.Z was gold
+dev-011    | typed_consult    | 1C62.0       | QA14,6D85.3,QA08.4 | Cat 2 (Reranker Demotion) | Gold 1C62.0 was rank 16 in retrieval, but reranker placed it outside top 3
+dev-013    | typed_consult    | CA22.0       | CA22.1,CA22.Z,CA22.0 | Cat 3 (Specificity Error) | Chose wrong specific sibling CA22.1 instead of CA22.0
+dev-019    | short_consult    | 1D80.0       | 1D80.1,1D80.Y,1D80.0 | Cat 3 (Specificity Error) | Chose wrong specific sibling 1D80.1 instead of 1D80.0
+dev-020    | typed_consult    | CA42.Z       | CA42.3,CA42.Z,CA42.5 | Cat 3 (Specificity Error) | Chose specific CA42.3 when unspecified (.Z) CA42.Z was gold
+dev-021    | typed_consult    | DA42.Z       | DA42.5,DA42.Z,DA42.Y | Cat 3 (Specificity Error) | Chose specific DA42.5 when unspecified (.Z) DA42.Z was gold
+dev-022    | typed_consult    | GC08.Z       | KA65.2,JB40.3,GC08.0 | Cat 2 (Reranker Demotion) | Gold GC08.Z was rank 5 in retrieval, but reranker placed it outside top 3
+dev-023    | short_consult    | FA01.Z       | FA0Z,KB46,FA01.2 | Cat 3 (Specificity Error) | Chose specific FA0Z when unspecified (.Z) FA01.Z was gold
+dev-031    | ambient_transcript | GA90         | CA0F.0,CA0F.Z,CA0F.1 | Cat 2 (Reranker Demotion) | Gold GA90 was rank 1 in retrieval, but reranker placed it outside top 3
+dev-033    | short_consult    | FA25.2Z      | FA25.11,FA25.1Z,FA25.10 | Cat 3 (Specificity Error) | Chose wrong specific sibling FA25.11 instead of FA25.2Z
+dev-035    | ambient_transcript | DA61         | DA60.3,DA60.Z,DA7Z | Cat 3 (Specificity Error) | Chose wrong specific sibling DA60.3 instead of DA61
+dev-036    | typed_consult    | EK00.6       | EK00.Z,EK00.6,EK12 | Cat 3 (Specificity Error) | Chose unspecified (.Z) EK00.Z when specific EK00.6 was gold
+dev-042    | short_consult    | BA00.0       | BA00.Z,BA00.1,BB01.Z | Cat 3 (Specificity Error) | Chose unspecified (.Z) BA00.Z when specific BA00.0 was gold
+dev-044    | typed_consult    | 5A21.0       | 5A11,GB90.45,5A41 | Cat 2 (Reranker Demotion) | Gold 5A21.0 was rank 12 in retrieval, but reranker placed it outside top 3
+dev-046    | short_consult    | JB64.0       | QB92,QA21.1,3A51.4 | Cat 1 (Retrieval Miss)   | Gold JB64.0 (Anaemia complicating pregnancy, childbirth or the puerperium) not in top-30 retrieval candidates
+dev-049    | typed_consult    | 4A84.0       | 4A84.Z,4A84.1,4A84.Y | Cat 3 (Specificity Error) | Chose unspecified (.Z) 4A84.Z when specific 4A84.0 was gold
+dev-050    | short_consult    | BC81.3Z      | BC81.30,BC81.3Z,BC81.31 | Cat 3 (Specificity Error) | Chose wrong specific sibling BC81.30 instead of BC81.3Z
+dev-052    | ambient_transcript | BD10         | BD1Z,BD10,BB01.Z | Cat 3 (Specificity Error) | Chose wrong specific sibling BD1Z instead of BD10
+dev-053    | typed_consult    | QA42.0       | QA43.5,QA43.Z,QA43.4 | Cat 3 (Specificity Error) | Chose wrong specific sibling QA43.5 instead of QA42.0
+dev-054    | short_consult    | 5A40.0       | 5A40.Z,5A40.0,5A41 | Cat 3 (Specificity Error) | Chose unspecified (.Z) 5A40.Z when specific 5A40.0 was gold
+dev-055    | typed_consult    | BA40.1       | BA40.Z,BA40.1,BA40.0 | Cat 3 (Specificity Error) | Chose unspecified (.Z) BA40.Z when specific BA40.1 was gold
+dev-057    | typed_consult    | 5A00.2Z      | 5A00.Z,5A00.0Y,5A00.20 | Cat 3 (Specificity Error) | Chose unspecified (.Z) 5A00.Z when specific 5A00.2Z was gold
+dev-058    | short_consult    | BD90.0       | 1H0Z,EH77,4A44.5 | Cat 1 (Retrieval Miss)   | Gold BD90.0 (Acute lymphadenitis) not in top-30 retrieval candidates
+dev-059    | typed_consult    | JA62.1       | GC00.Z,GC00.1,GC00.3 | Cat 2 (Reranker Demotion) | Gold JA62.1 was rank 7 in retrieval, but reranker placed it outside top 3
+dev-060    | ambient_transcript | 5B81.01      | 5B81.Z,5B81.Y,LD29 | Cat 3 (Specificity Error) | Chose unspecified (.Z) 5B81.Z when specific 5B81.01 was gold
+================================================================================

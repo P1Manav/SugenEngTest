@@ -271,3 +271,45 @@
 3. Keeping unverified claims in README — rewritten to present honest metrics on dev (44.58 / 75.0) and smoke set (labeled as self-written smoke test).
 
 **What decided it:** Passes `scripts/docker_context_check.py --run` with 0 errors, 0 constant fallbacks, and exact score 44.58 / 75.0. All 9 unit tests pass.
+
+---
+
+## Entry 19 — 2026-11-07 10:25 IST — Diagnostic Triage, Ablation Harness & Latency Profiling Tooling
+
+**Commit:** `<to-be-committed>`  
+**Task:** 2.1, 2.2, 2.3, 2.4  
+**Decision:** Built comprehensive diagnostic, benchmarking, and merge gate verification tooling prior to any model or algorithmic upgrades:
+1. `scripts/failure_report.py`: Categorizes errors into 5 diagnostic buckets (Retrieval Miss, Reranker Demotion, Specificity Error, Assertion Failure, Language Issue) with candidate Recall@10/30/50, and breaks down performance by style and chapter. Baseline report saved to `docs/baseline_failure_report.txt`.
+2. `scripts/ablate.py`: Systematic ablation runner testing 7 architecture switches with empirical 95% bootstrap confidence intervals (1,000 resamples).
+3. `scripts/bench_runtime.py`: Profiles per-stage latency breakdown and times 600 notes through parallel worker pool.
+4. `scripts/full_check.sh`: Automated merge gate running Ruff, unit tests, and isolated Docker runtime validation.
+
+### Empirical Ablation Results on Dev (60 notes)
+
+| Ablation Variant | Top-1 Accuracy (95% CI) | Top-3 Accuracy (95% CI) | Score / 75.0 (95% CI) | Recall@30 | Runtime |
+|:---|:---:|:---:|:---:|:---:|:---:|
+| **Full Baseline** | **53.3%**<br>[40.0%, 66.7%] | **71.7%**<br>[60.0%, 83.3%] | **44.58**<br>[36.24, 52.92] | 95.0% | 25.4s |
+| Dense-only (no BM25) | **51.7%**<br>[38.3%, 65.0%] | **71.7%**<br>[60.0%, 83.3%] | **43.75**<br>[35.42, 52.50] | 86.7% | 4.5s |
+| BM25-only (no Dense) | **55.0%**<br>[41.7%, 68.3%] | **71.7%**<br>[60.0%, 81.7%] | **45.42**<br>[36.67, 54.17] | 93.3% | 22.7s |
+| No Abbreviations | **53.3%**<br>[40.0%, 66.7%] | **71.7%**<br>[60.0%, 83.3%] | **44.58**<br>[36.24, 52.92] | 95.0% | 25.6s |
+| No Assertion Filter | **55.0%**<br>[41.7%, 66.7%] | **80.0%**<br>[70.0%, 90.0%] | **47.50**<br>[39.58, 55.42] | 98.3% | 28.6s |
+| No Specificity Descent | **28.3%**<br>[16.7%, 40.0%] | **38.3%**<br>[25.0%, 51.7%] | **23.75**<br>[15.42, 32.92] | 81.7% | 23.8s |
+| No Reranker | **46.7%**<br>[35.0%, 60.0%] | **70.0%**<br>[58.3%, 81.7%] | **40.83**<br>[32.50, 49.58] | 95.0% | 26.2s |
+
+### Runtime & Latency Profile (600 Notes Benchmark)
+- **Total Wall-Clock Time (600 notes):** 253.40 seconds (**4.22 minutes**), consuming only 7.0% of the 60-minute limit (well under the < 25-minute guardrail).
+- **Effective Throughput:** 2.37 notes/sec (422.3 ms/note).
+- **Per-Stage Latency Breakdown (Mean ms / share):**
+  - Language ID: 0.49 ms (0.1%)
+  - Clinical Extraction: 1.18 ms (0.3%)
+  - Assertion Filtering: 0.26 ms (0.1%)
+  - Hybrid Retrieval: 367.46 ms (96.5%)
+  - Hierarchy Descent: 10.56 ms (2.8%)
+  - Reranking & Diversity: 0.87 ms (0.2%)
+  - Total end-to-end: 380.82 ms mean, 614.52 ms p95.
+
+### Key Architectural Findings:
+1. **Specificity Descent is essential:** Without it, performance drops from 44.58 to 23.75 (-46.7%), demonstrating that navigating the MMS parent-child category tree is the primary driver of exact leaf match accuracy.
+2. **Assertion Filter Precision Gap:** Disabling the current assertion filter boosts Top-3 from 71.7% to 80.0%, identifying false-negative clause rejections (e.g., dev-038 functional constipation where "no alarm features" negated the assessment).
+3. **Retrieval Bottleneck:** Hybrid retrieval accounts for 96.5% of pipeline latency; optimizing retrieval candidate pruning will yield major throughput gains.
+

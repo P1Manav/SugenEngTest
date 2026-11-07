@@ -14,7 +14,7 @@ def download_model(model_name: str = DEFAULT_MODEL_NAME, target_dir: str = DEFAU
     """Download model and save to target directory for offline use."""
     print(f"Downloading model '{model_name}' to '{target_dir}'...")
     os.makedirs(target_dir, exist_ok=True)
-    
+
     # Download from huggingface and save locally
     model = SentenceTransformer(model_name)
     model.save(target_dir)

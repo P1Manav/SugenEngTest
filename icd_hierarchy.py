@@ -130,7 +130,7 @@ class ICDHierarchy:
 
     def resolve_to_leaf(self, code: str, note_text: str = "") -> str:
         """If code is not a leaf, descend to the best specific child or fallback to .Z.
-        
+
         Strictly requires distinguishing child qualifiers or synonyms to match in the text
         before descending to a specific child; otherwise falls back to the .Z unspecified leaf.
         """

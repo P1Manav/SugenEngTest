@@ -33,9 +33,22 @@ class ICD11Pipeline:
         dense_codes_path: str = "kb/dense_codes.json",
         model_path: str = "models/all-MiniLM-L6-v2",
         verbose: bool = False,
+        use_bm25: bool = True,
+        use_dense: bool = True,
+        use_abbreviations: bool = True,
+        use_assertion_filter: bool = True,
+        use_specificity_descent: bool = True,
+        use_reranker: bool = True,
     ):
         if verbose:
             print("Initializing ICD-11 Pipeline...")
+        self.verbose = verbose
+        self.use_bm25 = use_bm25
+        self.use_dense = use_dense
+        self.use_abbreviations = use_abbreviations
+        self.use_assertion_filter = use_assertion_filter
+        self.use_specificity_descent = use_specificity_descent
+        self.use_reranker = use_reranker
         # Fallback counter
         self.fallback_count = 0
 
@@ -97,14 +110,18 @@ class ICD11Pipeline:
 
         return sorted(list(self.valid_codes))[:3]
 
-    def predict_note(self, note: dict[str, Any]) -> dict[str, Any]:
+    def predict_note(self, note: dict[str, Any], debug: bool = False) -> dict[str, Any]:
         """Predict top-3 ICD-11 codes for a clinical note."""
         note_id = note.get("id", "unknown")
         raw_text = note.get("text", "")
         style = note.get("style")
 
         if not raw_text.strip():
-            return {"id": note_id, "codes": self._get_bm25_fallback(raw_text)}
+            fallback = self._get_bm25_fallback(raw_text)
+            res = {"id": note_id, "codes": fallback}
+            if debug:
+                res["debug"] = {"raw_candidates": [], "resolved_candidates": [], "reranked": []}
+            return res
 
         try:
             # Detect language and translate clinical terms if non-English
@@ -112,65 +129,86 @@ class ICD11Pipeline:
             input_text = translate_clinical_text(raw_text, lang) if lang != "en" else raw_text
 
             # 1. Expand abbreviations & extract diagnostic phrases
-            extracted = self.extractor.extract_diagnoses(input_text, style=style)
-            primary_query = extracted["primary_query"]
-            extracted_phrases = extracted["phrases"]
-            expanded_text = extracted["expanded_text"]
+            if self.use_abbreviations:
+                extracted = self.extractor.extract_diagnoses(input_text, style=style)
+                primary_query = extracted["primary_query"]
+                extracted_phrases = extracted["phrases"]
+                expanded_text = extracted["expanded_text"]
+            else:
+                extracted = self.extractor.extract_diagnoses(input_text, style=style)
+                primary_query = extracted["primary_query"]
+                extracted_phrases = extracted["phrases"]
+                expanded_text = input_text
 
             # Filter extracted phrases to strictly affirmed clauses (drop e.g. "malaria excluded")
             affirmed_phrases = []
-            for p in extracted_phrases:
-                for cl in split_sentences_and_clauses(p):
-                    if self.assertion_filter.check_clause_assertion(cl)["affirmed"]:
-                        affirmed_phrases.append(cl)
-            if affirmed_phrases:
-                primary_query = " ".join(affirmed_phrases)
-                extracted_phrases = affirmed_phrases
-
-            # 2. Filter out negated clauses and previous misdiagnoses from note text
-            filtered_note_text, rejected_clauses = self.assertion_filter.filter_text_for_retrieval(expanded_text)
+            if self.use_assertion_filter:
+                for p in extracted_phrases:
+                    for cl in split_sentences_and_clauses(p):
+                        if self.assertion_filter.check_clause_assertion(cl)["affirmed"]:
+                            affirmed_phrases.append(cl)
+                if affirmed_phrases:
+                    primary_query = " ".join(affirmed_phrases)
+                    extracted_phrases = affirmed_phrases
+                filtered_note_text, rejected_clauses = self.assertion_filter.filter_text_for_retrieval(expanded_text)
+            else:
+                filtered_note_text = expanded_text
+                rejected_clauses = []
 
             # 3. Hybrid retrieval (BM25 + Dense + RRF)
             raw_candidates = self.retriever.retrieve(
                 primary_query=primary_query,
                 fallback_query=filtered_note_text,
                 top_k=40,
+                use_bm25=self.use_bm25,
+                use_dense=self.use_dense,
             )
 
             # 4. Filter out candidates whose titles are negated in the note
-            filtered_candidates = []
-            for code, score in raw_candidates:
-                info = self.kb.get(code)
-                if info:
-                    title = info.get("title", "")
-                    if self.assertion_filter.is_candidate_negated_in_note(title, expanded_text, affirmed_phrases=extracted_phrases):
-                        continue
-                filtered_candidates.append((code, score))
-
-            if not filtered_candidates:
+            if self.use_assertion_filter:
+                filtered_candidates = []
+                for code, score in raw_candidates:
+                    info = self.kb.get(code)
+                    if info:
+                        title = info.get("title", "")
+                        if self.assertion_filter.is_candidate_negated_in_note(title, expanded_text, affirmed_phrases=extracted_phrases):
+                            continue
+                    filtered_candidates.append((code, score))
+                if not filtered_candidates:
+                    filtered_candidates = raw_candidates
+            else:
                 filtered_candidates = raw_candidates
 
             # 5. Expand candidates via ICD hierarchy (.Z siblings, children, parent)
-            expanded_candidates = self.hierarchy.expand_candidates(filtered_candidates, max_expansions=50)
+            if self.use_specificity_descent:
+                expanded_candidates = self.hierarchy.expand_candidates(filtered_candidates, max_expansions=50)
+            else:
+                expanded_candidates = filtered_candidates
 
             # 6. Resolve all candidates to valid leaf codes
             resolved_candidates: list[tuple[str, float]] = []
             seen_codes: set[str] = set()
 
             for code, score in expanded_candidates:
-                leaf_code = self.hierarchy.resolve_to_leaf(code, primary_query or filtered_note_text)
+                if self.use_specificity_descent:
+                    leaf_code = self.hierarchy.resolve_to_leaf(code, primary_query or filtered_note_text)
+                else:
+                    leaf_code = self.hierarchy.get_z_code(code) or code
                 norm_c = normalize_code(leaf_code)
                 if norm_c and norm_c in self.valid_codes and norm_c not in seen_codes:
                     seen_codes.add(norm_c)
                     resolved_candidates.append((norm_c, score))
 
             # 7. Rerank candidates using exact matches & overlap with assessment
-            reranked = self.reranker.rerank(
-                resolved_candidates,
-                extracted_phrases=extracted_phrases or [primary_query],
-                note_text=expanded_text,
-                top_k=25,
-            )
+            if self.use_reranker:
+                reranked = self.reranker.rerank(
+                    resolved_candidates,
+                    extracted_phrases=extracted_phrases or [primary_query],
+                    note_text=expanded_text,
+                    top_k=25,
+                )
+            else:
+                reranked = resolved_candidates[:25]
 
             # 8. Diversity selection for top-3
             selected_codes = self._select_diverse_top3(reranked, primary_query, expanded_text)
@@ -179,14 +217,30 @@ class ICD11Pipeline:
             if not selected_codes:
                 selected_codes = self._get_bm25_fallback(raw_text)
 
-            return {"id": note_id, "codes": selected_codes[:3]}
+            res = {"id": note_id, "codes": selected_codes[:3]}
+            if debug:
+                res["debug"] = {
+                    "lang": lang,
+                    "primary_query": primary_query,
+                    "extracted_phrases": extracted_phrases,
+                    "raw_candidates": raw_candidates[:50],
+                    "filtered_candidates": filtered_candidates[:50],
+                    "resolved_candidates": resolved_candidates[:50],
+                    "reranked": reranked[:50],
+                    "rejected_clauses": rejected_clauses,
+                }
+            return res
 
         except Exception as e:
             # Resilient fallback with stderr logging and BM25 recovery, never a constant RA01
             self.fallback_count += 1
             sys.stderr.write(f"[ERROR] Note {note_id} failed in pipeline: {e}\n")
             traceback.print_exc(file=sys.stderr)
-            return {"id": note_id, "codes": self._get_bm25_fallback(raw_text)[:3]}
+            fallback = self._get_bm25_fallback(raw_text)[:3]
+            res = {"id": note_id, "codes": fallback}
+            if debug:
+                res["debug"] = {"error": str(e), "raw_candidates": [], "resolved_candidates": [], "reranked": []}
+            return res
 
     def _select_diverse_top3(
         self,
