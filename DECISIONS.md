@@ -426,4 +426,36 @@
 
 **What decided it:** Eliminates all dev-specific overfitting. Solves generalization via principled semantic mechanisms. All 18 unit tests pass and `docker_context_check.py --run` passes cleanly.
 
+---
+
+## Entry 23 — 2026-11-07 13:10 IST — Assertion & Negation Test Suite Across All Three Clinical Styles
+
+**Commit:** `cf9274a`  
+**Task:** 6.F (Assertion and Negation verification across styles)  
+**Decision:** Implemented a targeted 15-case test suite in `tests/test_assertion_styles.py` evaluating `AssertionFilter` and `ICD11Pipeline` behavior across the three official clinical note styles (typed consult, short consult, ambient transcript), with 5 synthetic test cases per style:
+
+1. **Typed Consult Style (5 cases):**
+   - Pulmonary tuberculosis excluded on negative sputum AFB smear (`1B10` strictly rejected; acute bronchitis assigned).
+   - Cardiac chest pain and shortness of breath denied in peptic ulcer disease (`DA61` assigned; circulatory codes rejected).
+   - Family history of type 2 diabetes with normal fasting glucose (`5A11` rejected; primary tension headache assigned).
+   - Ruled-out malaria via negative mRDT/smear in acute cystitis (`1F40` rejected).
+   - Ruled-out pre-eclampsia in routine antenatal visit (`JA24` rejected; antenatal supervision assigned).
+
+2. **Short Consult Style (5 cases):**
+   - Coryza and cough denied in confirmed streptococcal pharyngitis.
+   - Negative pregnancy test (UPT) in acute uncomplicated cystitis (obstetric chapters `JA`/`JB` strictly withheld).
+   - Radiograph confirming no fracture in degenerative knee osteoarthritis (`NC32`/fractures rejected; `FA01` assigned).
+   - Asthma and food allergy denied in contact dermatitis due to nickel buckle (`EK00` assigned).
+   - Normal ECG and negative serial troponins in GERD (`BA40` ischemic heart disease rejected; `DA2` assigned).
+
+3. **Ambient Transcript Style (5 cases):**
+   - Bloody diarrhea/dysentery denied in stool-confirmed Giardiasis (`1A36` rejected; `1A3` assigned).
+   - Exertional chest pain denied on stair climbing in postprandial GERD.
+   - Wheezing and respiratory distress denied in acute flare of atopic dermatitis behind knees (`CA23` asthma rejected; `EA80` assigned).
+   - Pregnancy denied following negative home test in simple ovarian cyst (`GA1` assigned; maternal codes rejected).
+   - Cough, fever, and night sweats denied in severe microcytic iron deficiency anemia (`3A00` assigned).
+
+**What decided it:** Confirms that assertion filtering and negation boundaries operate reliably across diverse documentation formats. Brings total unit test suite to 33 passing tests with zero regressions.
+
+
 
