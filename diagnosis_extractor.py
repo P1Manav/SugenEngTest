@@ -10,13 +10,13 @@ from assertion_filter import split_sentences_and_clauses
 
 # Assessment / Impression / Diagnosis line headers (multilingual)
 RE_ASSESSMENT_HEADER = re.compile(
-    r"(?:^|\n|\b)(?:A|Imp|Dx|Diagnosis|Assessment|Impression|D|Diagnóstico|Diagnostico|Diagnostic|Utambuzi|Biópsia|Biopsia|Biopsie|Endoscopia|Endoscopie|Histology|Histopathology|Histopathologie|निदान|डायग्नोसिस|التشخيص|诊断|中医辨证|辨证诊断)\s*[:\-]\s*(.*?)(?=(?:\n\s*(?:P|Plan|Rx|Mx|Ix|S|O|O/E|R/v|Review|Return|Tratamiento|Traitement|Plano|Mpango)\s*[:\-]|\Z))",
+    r"(?:^|\n|\b)(?:A|Imp|Dx|Diagnosis|Assessment|Impression|D|Diagnose|Befund|Beurteilung|Diagnóstico|Diagnostico|Diagnostic|Utambuzi|Biópsia|Biopsia|Biopsie|Endoscopia|Endoscopie|Histology|Histopathology|Histopathologie|निदान|डायग्नोसिस|التشخيص|诊断|中医辨证|辨证诊断)\s*[:\-]\s*(.*?)(?=(?:\n\s*(?:P|Plan|Rx|Mx|Ix|S|O|O/E|R/v|Review|Return|Therapie|Tratamiento|Traitement|Plano|Mpango)\s*[:\-]|\Z))",
     re.IGNORECASE | re.DOTALL,
 )
 
 # Inline diagnosis markers often seen in short consults without clean newlines
 RE_INLINE_DX = re.compile(
-    r"(?:\b(?:Dx|Imp|Impression|Diagnosis|Assessment|Diagnóstico|Diagnostico|Diagnostic|Utambuzi|Biópsia|Biopsia|Biopsie|Endoscopia|Endoscopie|Histology|Histopathology|Histopathologie|निदान|डायग्नोसिस|التشخيص|诊断|中医辨证|辨证诊断)\b\s*[:\-]?\s*([^\n.;]+)|\b(?:诊断|中医辨证|辨证诊断)\s*[:：]\s*([^\n.;]+))",
+    r"(?:\b(?:Dx|Imp|Impression|Diagnosis|Assessment|Diagnose|Befund|Beurteilung|Diagnóstico|Diagnostico|Diagnostic|Utambuzi|Biópsia|Biopsia|Biopsie|Endoscopia|Endoscopie|Histology|Histopathology|Histopathologie|निदान|डायग्नोसिस|التشخيص|诊断|中医辨证|辨证诊断)\b\s*[:\-]?\s*([^\n.;]+)|\b(?:诊断|中医辨证|辨证诊断)\s*[:：]\s*([^\n.;]+))",
     re.IGNORECASE,
 )
 

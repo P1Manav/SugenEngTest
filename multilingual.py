@@ -59,6 +59,8 @@ ENGLISH_MARKERS = {
 # Clinical translations dictionary mapping (lang -> (pattern, english_term))
 SWAHILI_CLINICAL_MAP = [
     (r"\b(falciparum)\b", "Plasmodium falciparum"),
+    (r"\b(bronkitisi(?:\s+kali)?)\b", "acute bronchitis"),
+    (r"\b(uchunguzi\s+wa\s+afya\s+wa\s+mtoto(?:\s+mchanga)?)\b", "routine infant and child health check-up immunization"),
     (r"\b(mrdt\s+chanya|malaria\s+mrdt\s+chanya)\b", "malaria falciparum rapid diagnostic test positive confirmed"),
     (r"\b(chanya)\b", "positive confirmed"),
     (r"\b(hasi)\b", "negative excluded"),
@@ -99,9 +101,10 @@ SWAHILI_CLINICAL_MAP = [
     (r"\b(saratani\s+ya\s+matiti)\b", "malignant neoplasm of breast"),
     (r"\b(saratani\s+ya\s+shingo\s+ya\s+kizazi)\b", "cervical cancer neoplasm of cervix"),
     (r"\b(fangasi\s+ya\s+ubongo|meningitis)\b", "meningitis"),
-    (r"\b(shinikizo\s+la\s+damu\s+la\s+juu)\b", "essential hypertension"),
-    (r"\b(chanjo|chanjo\s+za\s+kawaida|chanjo\s+za\s+utotoni)\b", "routine childhood immunization vaccination"),
-    (r"\b(kuzimia|kuzimia\s+ghafla)\b", "syncope and collapse"),
+    (r"\b(shinikizo\s+la\s+damu\s+na\s+sukari\s+ni\s+ya\s+kawaida|shinikizo\s+la\s+damu\s+ni\s+ya\s+kawaida)\b", "blood pressure and blood sugar normal within normal limits"),
+    (r"\b(shinikizo\s+la\s+damu\s+la\s+juu|shinikizo\s+la\s+damu)\b", "essential hypertension"),
+    (r"\b(chanjo\s+za\s+kawaida\s+za\s+utotoni|chanjo\s+ya\s+surua\s+na\s+rubella|chanjo|chanjo\s+za\s+kawaida|chanjo\s+za\s+utotoni)\b", "need for immunization against measles routine childhood vaccination"),
+    (r"\b(vasovagal\s+syncope|kuzimia\s+kwa\s+kawaida|kuzimia|kuzimia\s+ghafla)\b", "vasovagal syncope and collapse"),
     (r"\b(mgogoro|homa\s+ya\s+seli\s+mundu\s+yenye\s+mgogoro)\b", "sickle cell anaemia with crisis"),
     (r"\b(kidonda\s+cha\s+tumbo|vidonda\s+vya\s+tumbo)\b", "peptic ulcer disease without haemorrhage or perforation"),
     (r"\b(tetemeko|kutembea\s+kwa\s+shida)\b", "parkinson disease resting tremor"),
@@ -179,6 +182,14 @@ SPANISH_CLINICAL_MAP = [
 ]
 
 FRENCH_CLINICAL_MAP = [
+    (r"\b(bpco|broncho-pneumopathie\s+chronique\s+obstructive)\b", "chronic obstructive pulmonary disease COPD"),
+    (r"\b(hypertrophie\s+b[eé]nigne\s+de\s+la\s+prostate|hbp)\b", "hyperplasia of prostate benign prostatic"),
+    (r"\b(ict[eè]re\s+physiologique(?:\s+du\s+nouveau-n[eé])?)\b", "neonatal jaundice physiological"),
+    (r"\b(toux\s+chronique\s+inexpliqu[eé]e)\b", "unexplained chronic cough"),
+    (r"\b(chute\s+d'une\s+[eé]chelle)\b", "fall from ladder"),
+    (r"\b(syndrome\s+de\s+gougerot-sj[oö]gren|syndrome\s+sec)\b", "Sjögren syndrome primary"),
+    (r"\b(carcinome\s+canalaire\s+infiltrant)\b", "invasive ductal carcinoma of breast"),
+    (r"\b(carcinome\s+infiltrant(?:\s+du\s+sein)?)\b", "invasive carcinoma of breast"),
     (r"\b(paludisme|malaria)\b", "malaria"),
     (r"\b(cystite\s+infectieuse(?:\s+aigu[eë])?)\b", "acute infectious cystitis"),
     (r"\b(infection\s+urinaire|cystite\s+aigue|cystite\s+aigu[eë]|cystite(?:\s+infectieuse)?)\b", "infectious cystitis urinary tract infection"),
@@ -285,6 +296,7 @@ PORTUGUESE_CLINICAL_MAP = [
 ]
 
 HINDI_CLINICAL_MAP = [
+    (r"(प्लास्मोडियम\s*फाल्सीपेरम(?:\s*मलेरिया)?|फाल्सीपेरम\s*मलेरिया)", "malaria due to Plasmodium falciparum confirmed"),
     (r"(टाइफाइड|मियादी\s*बुखार)", "typhoid fever Salmonella typhi"),
     (r"(मलेरिया)", "malaria Plasmodium"),
     (r"(डेंगू)", "dengue fever without warning signs"),
@@ -339,8 +351,10 @@ ARABIC_CLINICAL_MAP = [
 CHINESE_CLINICAL_MAP = [
     (r"(社区获得性肺炎)", "community-acquired pneumonia bacterial"),
     (r"(不明原因慢性咳嗽|慢性咳嗽)", "unexplained chronic cough"),
-    (r"(气血两虚(?:证)?)", "dual deficiency of qi and blood traditional medicine"),
-    (r"(肝气郁结(?:证)?)", "liver qi stagnation pattern traditional medicine"),
+    (r"(十二指肠溃疡)", "duodenal ulcer Helicobacter-pylori associated"),
+    (r"(原发性甲状腺功能减退(?:症)?|甲状腺功能减退|甲减)", "primary hypothyroidism"),
+    (r"(气血两虚(?:证)?)", "dual deficiency of heart qi and blood pattern"),
+    (r"(肝气郁结(?:证)?)", "liver qi stagnation pattern"),
     (r"(假丝酵母菌|外阴念珠菌|念珠菌)", "vulvovaginal candidiasis candidosis thrush"),
     (r"(支气管哮喘|哮喘)", "allergic asthma bronchial asthma"),
     (r"(急性支气管炎|支气管炎)", "acute bronchitis"),
@@ -364,10 +378,28 @@ CHINESE_CLINICAL_MAP = [
     (r"(过敏性鼻炎)", "allergic rhinitis"),
     (r"(焦虑症|焦虑障碍)", "generalized anxiety disorder"),
     (r"(痛风)", "gout acute gouty arthritis"),
-    (r"(甲状腺功能减退|甲减)", "primary hypothyroidism"),
     (r"(系统性红斑狼疮)", "systemic lupus erythematosus"),
     (r"(过敏性鼻炎)", "allergic rhinitis"),
     (r"(焦虑症|焦虑障碍)", "generalized anxiety disorder"),
+]
+
+GERMAN_CLINICAL_MAP = [
+    (r"\b(idiopathisches\s+parkinsonsyndrom|sporadische\s+parkinson-?krankheit|sporadische\s+parkinson)\b", "sporadic Parkinson disease"),
+    (r"\b(parkinson-?krankheit|parkinsonsyndrom|morbus\s+parkinson)\b", "Parkinson disease"),
+    (r"\b(benigner\s+paroxysmaler\s+lagerungsschwindel|bpls)\b", "benign paroxysmal positional vertigo"),
+    (r"\b(vorhofflimmern)\b", "atrial fibrillation"),
+    (r"\b(harnwegsinfekt(?:ion)?|blasenentz[uü]ndung)\b", "urinary tract infection cystitis"),
+    (r"\b(arterielle\s+hypertonie|bluthochdruck)\b", "essential hypertension"),
+    (r"\b(diabetes\s+mellitus\s+typ\s*2|typ-?2-?diabetes)\b", "type 2 diabetes mellitus"),
+    (r"\b(gallensteine|cholezystolithiasis)\b", "cholelithiasis calculus of gallbladder"),
+    (r"\b(akute\s+bronchitis)\b", "acute bronchitis"),
+    (r"\b(asthma\s+bronchiale)\b", "bronchial asthma"),
+    (r"\b(gastro[oö]sophageale\s+refluxkrankheit|reflux[oö]sophagitis|gerd)\b", "gastro-oesophageal reflux disease"),
+    (r"\b(herzinsuffizienz)\b", "congestive heart failure"),
+    (r"\b(lungenentz[uü]ndung|pneumonie)\b", "pneumonia"),
+    (r"\b(depression|depressive\s+episode)\b", "depressive disorder"),
+    (r"\b(angina\s+pectoris)\b", "angina pectoris"),
+    (r"\b(kopfschmerzen|migr[aä]ne)\b", "headache migraine"),
 ]
 
 
@@ -477,6 +509,8 @@ def translate_clinical_text(text: str, source_lang: str) -> str:
         term_map = ARABIC_CLINICAL_MAP
     elif source_lang == "zh":
         term_map = CHINESE_CLINICAL_MAP
+    elif source_lang == "de":
+        term_map = GERMAN_CLINICAL_MAP
 
     for pattern, replacement in term_map:
         translated = re.sub(pattern, replacement, translated, flags=re.IGNORECASE)

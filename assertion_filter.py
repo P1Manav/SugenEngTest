@@ -42,6 +42,14 @@ POST_NEGATION_TRIGGERS = [
     r"\bnot\s+seen\b",
     r"\bunlikely\b",
     r"\babsent\b",
+    r"\bnormal\b",
+    r"\bwnl\b",
+    r"\bwithin\s+normal\s+limits\b",
+    r"\bunremarkable\b",
+    r"\bnon-?tender\b",
+    r"\bni\s+ya\s+kawaida\b",
+    r"\bya\s+kawaida\b",
+    r"\bnormale?s?\b",
 ]
 
 # Ruled out / query triggers (differential / uncertainty)
@@ -139,6 +147,9 @@ NON_DIAGNOSTIC_TERMS = {
     "syndrome", "type", "part", "site", "mild", "moderate", "severe",
     "stage", "level", "state", "general", "generalised", "generalized",
     "mention", "due", "post", "status", "recurrent", "persistent",
+    "pregnancy", "pregnant", "childbirth", "puerperium", "maternal",
+    "infant", "child", "adult", "adults", "onset", "arising", "developing",
+    "associated", "related",
 }
 
 
@@ -210,7 +221,7 @@ class AssertionFilter:
         if affirmed_phrases:
             for phrase in affirmed_phrases:
                 p_lower = phrase.lower()
-                if any(re.search(r"\b" + re.escape(w) + r"\b", p_lower) for w in words):
+                if all(re.search(r"\b" + re.escape(w) + r"\b", p_lower) for w in words):
                     return False
 
         clauses = split_sentences_and_clauses(note_text)

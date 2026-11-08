@@ -196,7 +196,7 @@ class ICD11Pipeline:
 
             for code, score in expanded_candidates:
                 if self.use_specificity_descent:
-                    leaf_code = self.hierarchy.resolve_to_leaf(code, primary_query or filtered_note_text)
+                    leaf_code = self.hierarchy.resolve_to_leaf(code, filtered_note_text)
                 else:
                     leaf_code = self.hierarchy.get_z_code(code) or code
                 norm_c = normalize_code(leaf_code)
@@ -275,11 +275,11 @@ class ICD11Pipeline:
 
         if primary_info:
             if primary_code.endswith(".Z") or primary_code.endswith("Z"):
-                # Primary is unspecified; try to find highest ranked specific sibling/child
+                # Primary is unspecified; try to find highest ranked specific sibling/child in same stem
                 for code, _ in ranked_candidates[1:]:
                     if code not in selected and self.hierarchy.is_leaf(code):
                         # If it shares parent or stem with primary
-                        if self.hierarchy.get_parent(code) == primary_info.get("parent"):
+                        if self.hierarchy.get_parent(code) == primary_info.get("parent") or code.split(".")[0] == primary_code.split(".")[0]:
                             alt_spec_code = code
                             break
             else:
@@ -287,6 +287,14 @@ class ICD11Pipeline:
                 z_code = self.hierarchy.get_z_code(primary_code)
                 if z_code and z_code in self.valid_codes and self.hierarchy.is_leaf(z_code) and z_code not in selected:
                     alt_spec_code = z_code
+                elif z_code:
+                    subtree_z = self.hierarchy.get_subtree_z_code(z_code)
+                    if subtree_z and subtree_z in self.valid_codes and self.hierarchy.is_leaf(subtree_z) and subtree_z not in selected:
+                        alt_spec_code = subtree_z
+                if not alt_spec_code and primary_info.get("parent"):
+                    parent_z = self.hierarchy.get_z_code(primary_info["parent"])
+                    if parent_z and parent_z in self.valid_codes and self.hierarchy.is_leaf(parent_z) and parent_z not in selected:
+                        alt_spec_code = parent_z
 
         if alt_spec_code and alt_spec_code not in selected:
             selected.append(alt_spec_code)

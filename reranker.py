@@ -2,10 +2,12 @@
 Combines retrieval scores with lexical overlap, section presence, and specificity cues.
 """
 
+import json
+import os
 import re
+import sys
 from typing import Any
 
-from clinical_concepts import extract_clinical_qualifiers
 from icd_hierarchy import CLINICAL_QUALIFIER_EQUIVALENTS
 from text_utils import tokenize
 
@@ -13,8 +15,18 @@ from text_utils import tokenize
 class RuleReranker:
     """Rerank candidates using exact phrase matches, assessment section alignment, and cue bonuses."""
 
-    def __init__(self, kb: dict[str, dict[str, Any]]):
+    def __init__(self, kb: dict[str, dict[str, Any]], exclusion_graph_path: str = "kb/exclusion_graph.json"):
         self.kb = kb
+        self.code_to_exclusions: dict[str, list[dict[str, Any]]] = {}
+        self.phrase_exclusions: dict[str, list[str]] = {}
+        if os.path.exists(exclusion_graph_path):
+            try:
+                with open(exclusion_graph_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                self.code_to_exclusions = data.get("code_to_exclusions", {})
+                self.phrase_exclusions = data.get("phrase_exclusions", {})
+            except Exception as e:
+                sys.stderr.write(f"[WARN] Failed to load exclusion graph: {e}\n")
 
     def score_candidate(
         self,
@@ -61,8 +73,8 @@ class RuleReranker:
                 break
 
         # Check official WHO synonyms and inclusions if title didn't match directly
-        GENERIC_STOP = {"due", "with", "and", "the", "for", "other", "specified", "unspecified", "from", "to", "in", "of", "by"}
-        GENERIC_MODIFIERS = {"stage", "grade", "class", "type", "level", "degree", "group", "phase", "mild", "moderate", "severe"}
+        GENERIC_STOP = {"due", "with", "and", "the", "for", "other", "specified", "unspecified", "from", "to", "in", "of", "by", "induced", "associated", "related", "caused"}
+        GENERIC_MODIFIERS = {"stage", "grade", "class", "type", "level", "degree", "group", "phase", "mild", "moderate", "severe", "non", "without", "with"}
 
         if not matched_synonym:
             for syn in info.get("synonyms", []) + info.get("inclusions", []):
@@ -70,26 +82,20 @@ class RuleReranker:
                 if len(syn_lower) < 4:
                     continue
 
-                # Extract aliases: stripped brackets [xyz], stripped NOS, or dash separations
-                bracketed = re.findall(r"\[(.*?)\]|\((.*?)\)", syn_lower)
+                # Extract aliases: stripped brackets, expanded brackets, or stripped NOS
                 aliases = [syn_lower]
-                clean_syn = re.sub(r"\[.*?\]|\(.*?\)", "", syn_lower).strip()
+                clean_syn = re.sub(r"\[.*?\]|\(.*?\)", "", syn_lower).strip(" -")
                 if clean_syn and clean_syn != syn_lower and len(clean_syn) >= 4:
                     aliases.append(clean_syn)
-                clean_nos = re.sub(r"\bnos\b", "", syn_lower).strip()
-                if clean_nos and clean_nos != syn_lower and len(clean_nos) >= 4:
+                expanded_syn = re.sub(r"\[(.*?)\]", r"\1", syn_lower).replace(" - ", " ").strip()
+                if expanded_syn and expanded_syn != syn_lower and expanded_syn not in aliases and len(expanded_syn) >= 4:
+                    aliases.append(expanded_syn)
+                clean_nos = re.sub(r"\bnos\b", "", syn_lower).strip(" -")
+                if clean_nos and clean_nos != syn_lower and clean_nos not in aliases and len(clean_nos) >= 4:
                     aliases.append(clean_nos)
-                clean_both = re.sub(r"\bnos\b", "", clean_syn).strip()
+                clean_both = re.sub(r"\bnos\b", "", clean_syn).strip(" -")
                 if clean_both and clean_both not in aliases and len(clean_both) >= 4:
                     aliases.append(clean_both)
-                for b in bracketed:
-                    for item in b:
-                        if item and len(item.strip()) >= 3:
-                            aliases.append(item.strip())
-                if " – " in syn_lower:
-                    aliases.extend([p.strip() for p in syn_lower.split(" – ") if len(p.strip()) >= 3])
-                elif " - " in syn_lower:
-                    aliases.extend([p.strip() for p in syn_lower.split(" - ") if len(p.strip()) >= 3])
 
                 syn_hit = False
                 for term in aliases:
@@ -149,7 +155,7 @@ class RuleReranker:
             GENERIC_BODY_SYSTEMS = {"respiratory", "rate", "system", "tract", "pressure", "pulse", "organ", "tissue", "disease", "disorder", "infection"}
             distinguishing = title_tokens - parent_toks - GENERIC_STOP - GENERIC_MODIFIERS - GENERIC_BODY_SYSTEMS
             if distinguishing:
-                has_dist_support = False
+                has_dist_support = matched_synonym
                 # 1. Check concept equivalents across compound title that distinguish child from parent
                 for concept, eqs in CLINICAL_QUALIFIER_EQUIVALENTS.items():
                     if parent_title and (concept in parent_title or concept.replace("-", " ") in parent_title):
@@ -161,12 +167,22 @@ class RuleReranker:
 
                 if not has_dist_support:
                     for dt in distinguishing:
-                        if dt in note_lower or (dt.endswith("s") and dt[:-1] in note_lower) or ((dt + "s") in note_lower):
+                        if re.search(r"\b" + re.escape(dt) + r"\b", note_lower) or (dt.endswith("s") and re.search(r"\b" + re.escape(dt[:-1]) + r"\b", note_lower)):
                             has_dist_support = True
                             break
                         # Check dictionary equivalents
                         eqs = CLINICAL_QUALIFIER_EQUIVALENTS.get(dt, [])
-                        if any(eq in note_lower for eq in eqs):
+                        if any(re.search(r"\b" + re.escape(eq) + r"\b", note_lower) for eq in eqs):
+                            has_dist_support = True
+                            break
+                        # Compound anatomical & clinical terms
+                        if dt == "vulvovaginal" and any(v in note_lower for v in ["vulva", "vulval", "vagina", "vaginal"]):
+                            has_dist_support = True
+                            break
+                        if dt in ("ductal", "canalaire") and any(d in note_lower for d in ["ductal", "canalaire", "duktal", "canalicular"]):
+                            has_dist_support = True
+                            break
+                        if dt in ("sporadic", "sporadische") and any(sp in note_lower for sp in ["sporadic", "sporadisch", "sporadische", "esporadica", "esporádica"]):
                             has_dist_support = True
                             break
                         # Clinical equivalents
@@ -221,7 +237,8 @@ class RuleReranker:
         # 4. Chapter 21 (Symptoms and signs) demotion when definitive disease is present
         chapter = info.get("chapter", "")
         if chapter == "21" or code.startswith("M"):
-            score -= 0.20
+            if not any(sym in note_lower for sym in ["syncope", "collapse", "kuzimia", "fainting", "faint", "vasovagal", "cough", "headache", "epistaxis"]):
+                score -= 0.15
 
         # Traditional medicine (Chapter 26) demotion only if no traditional medicine terms in note
         if chapter == "26" or code.startswith("S"):
@@ -281,7 +298,8 @@ class RuleReranker:
                 score -= 0.40
 
         # 8. Age & life-stage consistency (multilingual support)
-        age_match = re.search(r"\b(\d{1,3})\s*(?:yo|y/o|yr|yrs|year|years|-year-old|ans|années|annees|años|anos|miaka|岁|歲)\b|\b(?:age[d\s:]+|edad\s*[:\s]+|âge\s*[:\s]+|idade\s*[:\s]+|miaka\s+)(\d{1,3})\b|\b(\d{1,3})\s*[MF]\b", note_text, re.IGNORECASE)
+        is_neonate = bool(re.search(r"\b(newborn|neonate|infant|nouveau-n[eé]|mtoto\s+mchanga|reci[eé]n\s+nacido|neugeborenes)\b", note_text, re.IGNORECASE))
+        age_match = re.search(r"\b(\d{1,3})\s*(?:yo|y/o|yr|yrs|year|years|-year-old|ans|années|annees|años|anos|miaka|岁|歲|عاما|عاماً|سنة|jahre|j[aä]hrig\w*)\b|\b(?:age[d\s:]+|edad\s*[:\s]+|âge\s*[:\s]+|idade\s*[:\s]+|miaka\s+|العmer\s*|العمر\s*)(\d{1,3})\b|\b(\d{1,3})\s*[MF]\b", note_text, re.IGNORECASE)
         age = None
         if age_match:
             age_str = next((g for g in age_match.groups() if g is not None), None)
@@ -290,7 +308,7 @@ class RuleReranker:
         if age is not None:
             if age >= 18:
                 # Adults cannot have neonatal diseases or conditions of prematurity
-                if chapter == "19" or code.startswith("KA") or "prematurity" in title or "neonatal" in title:
+                if chapter == "19" or code.startswith(("KA", "KB", "KC")) or "prematurity" in title or "neonatal" in title:
                     score -= 0.40
                 elif "in adults" in title or "adult" in title:
                     score += 0.06
@@ -300,16 +318,19 @@ class RuleReranker:
                 elif "in children" in title or "child" in title:
                     score += 0.06
 
+        # Perinatal chapter 19 demotion if patient is not explicitly a neonate/infant
+        if (chapter == "19" or code.startswith(("KA", "KB", "KC"))) and not is_neonate:
+            score -= 0.35
+
         # 9. Pregnancy & obstetric consistency (multilingual support)
-        is_neonate = bool(re.search(r"\b(newborn|neonate|infant|nouveau-n[eé]|mtoto\s+mchanga|reci[eé]n\s+nacido)\b", note_text, re.IGNORECASE))
         if is_neonate:
             if chapter == "18" or code.startswith(("JA", "JB")):
                 score -= 0.40
-            elif chapter == "19" or code.startswith("KA") or "fetus or newborn" in title:
+            elif chapter == "19" or code.startswith(("KA", "KB", "KC")) or "fetus or newborn" in title:
                 score += 0.15
 
-        is_pregnant = bool(re.search(r"\b(anc\b|antenatal|pregnant|pregnancy|gestation|trimester|fundal|fhr|edd|g\d+p\d+|\d+/\d+\s*weeks?|enceinte|grossesse|embarazada|embarazo|gravidez|gestante|ujauzito|mimba)\b", note_text, re.IGNORECASE))
-        is_not_pregnant = bool(re.search(r"\b(upt\s*neg|pregnancy\s*test\s*neg|not\s*pregnant)\b", note_text, re.IGNORECASE))
+        is_not_pregnant = bool(re.search(r"\b(upt\s*neg\w*|pregnancy\s*test[^\n.;]*neg\w*|not\s*pregnant|negative\s+pregnancy\s+test|denies\s+(?:any\s+)?pregnancy|non-?pregnant)\b", note_text, re.IGNORECASE))
+        is_pregnant = bool(re.search(r"\b(anc\b|antenatal|pregnant|pregnancy|gestation|trimester|fundal|fhr|edd|g\d+p\d+|\d+/\d+\s*weeks?|enceinte|grossesse|embarazada|embarazo|gravidez|gestante|ujauzito|mimba)\b", note_text, re.IGNORECASE)) and not is_not_pregnant
         if is_not_pregnant or (age is not None and age >= 50 and not is_pregnant):
             if chapter == "18" or code.startswith(("JA", "JB")):
                 score -= 0.40
@@ -341,13 +362,30 @@ class RuleReranker:
                 score -= 0.12
 
         # 12. Uncomplicated / complicated clinical alignment
-        if any(uncomp in note_lower for uncomp in ["uncomplicated", "no complication", "no complications", "without complication"]):
+        if any(uncomp in note_lower for uncomp in ["uncomplicated", "no complication", "no complications", "without complication", "sin complicaciones", "sans complication", "bila matatizo"]):
             if "without complication" in title or "uncomplicated" in title:
-                score += 0.06
+                score += 0.08
             elif code.endswith(".Z") or code.endswith("Z"):
                 score += 0.02
             if "with complication" in title or "cerebral" in title:
-                score -= 0.07
+                score -= 0.15
+        elif any(comp in note_lower for comp in ["with complication", "complicated", "cerebral malaria", "orchitis", "peritonitis", "encephalitis"]):
+            if "with complication" in title or "cerebral" in title:
+                score += 0.08
+            elif "without complication" in title or "uncomplicated" in title:
+                score -= 0.15
+
+        # 12b. Psychotic features alignment
+        if "with psychotic" in title:
+            if any(p in note_lower for p in ["no psychotic", "without psychotic", "sin sintomas psicoticos", "sans symptome psychotique", "keine psychotisch"]):
+                score -= 0.25
+            elif not any(p in note_lower for p in ["psychotic", "delusion", "hallucination", "psicosis", "psychose"]):
+                score -= 0.08
+        elif "without psychotic" in title:
+            if any(p in note_lower for p in ["no psychotic", "without psychotic", "sin sintomas psicoticos", "sans symptome psychotique", "keine psychotisch"]):
+                score += 0.08
+            elif not any(p in note_lower for p in ["psychotic", "delusion", "hallucination", "psicosis", "psychose"]):
+                score += 0.04
 
         # 13. Acute encounter in Impression vs background history
         if "hypoglycaemia" in note_lower and any(h in extracted_text for h in ["hypoglycaemia", "low sugar"]):
@@ -397,11 +435,44 @@ class RuleReranker:
         note_text: str,
         top_k: int = 30,
     ) -> list[tuple[str, float]]:
-        """Rerank candidate list."""
+        """Rerank candidate list with WHO exclusion conflict resolution."""
+        if not candidates:
+            return []
+
         scored = []
         for code, base_score in candidates:
             final_score = self.score_candidate(code, base_score, extracted_phrases, note_text)
             scored.append((code, final_score))
 
-        sorted_candidates = sorted(scored, key=lambda x: x[1], reverse=True)
+        # Exclusion conflict resolution
+        cand_code_set = {c for c, _ in scored}
+        cand_score_map = {c: s for c, s in scored}
+        note_lower = note_text.lower()
+        extracted_text_lower = " ".join(extracted_phrases).lower()
+
+        adjusted = []
+        for code, score in scored:
+            adj_score = score
+
+            # A. Code-to-Code Exclusion: code excludes target_code, and target is in candidate pool
+            targets = self.code_to_exclusions.get(code, [])
+            for item in targets:
+                t_code = item.get("target_code")
+                if t_code in cand_code_set and t_code != code:
+                    t_score = cand_score_map.get(t_code, 0.0)
+                    if t_score >= 0.5:
+                        # Competing condition with substantial evidence excludes this code
+                        adj_score -= 0.12
+                        break
+
+            # B. Note-Level Phrase Exclusion: note mentions an explicit exclusion condition phrase
+            excl_phrases = self.phrase_exclusions.get(code, [])
+            for phrase in excl_phrases:
+                if len(phrase) >= 5 and (phrase in extracted_text_lower or phrase in note_lower):
+                    adj_score -= 0.15
+                    break
+
+            adjusted.append((code, adj_score))
+
+        sorted_candidates = sorted(adjusted, key=lambda x: x[1], reverse=True)
         return sorted_candidates[:top_k]

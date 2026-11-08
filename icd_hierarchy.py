@@ -25,8 +25,8 @@ CLINICAL_QUALIFIER_EQUIVALENTS: dict[str, list[str]] = {
     "chronic": ["chronic", "longstanding", "persistent", "recurrent"],
     "open": ["open", "compound"],
     "closed": ["closed", "simple"],
-    "primary": ["primary", "essential", "idiopathic"],
-    "secondary": ["secondary"],
+    "primary": ["primary", "essential", "idiopathic", "primitif", "primitive", "primario", "primaria", "primär", "primaer", "idiopathisch"],
+    "secondary": ["secondary", "secondaire", "sekundär", "secundario", "secundaria"],
     "type 1": ["type 1", "type i", "t1dm", "iddm", "juvenile"],
     "type 2": ["type 2", "type ii", "t2dm", "niddm", "adult-onset"],
     "right": ["right", "rt", "r side"],
@@ -37,17 +37,23 @@ CLINICAL_QUALIFIER_EQUIVALENTS: dict[str, list[str]] = {
     "unconfirmed": ["unconfirmed", "suspected", "presumed", "probable", "clinically diagnosed", "without confirmation", "non confirmé", "no confirmado", "hasi"],
     "infectious": ["infectious", "infection", "infective", "bacterial", "viral", "microbial", "pathogen", "uti", "maambukizi", "infecciosa", "infeccioso", "infeccion", "infección", "infectieuse", "infectieux", "purulent", "pus"],
     "uncomplicated": ["uncomplicated", "without complication", "no complication", "no complications", "without peritonitis", "no peritonitis", "without warning signs", "no warning signs", "non-severe", "sans complication", "sin complicaciones", "bila matatizo"],
-    "non-erosive": ["non-erosive", "nerd", "reflux", "gerd", "erge", "rgo", "no erosiva", "não erosiva", "nao erosiva", "sin erosiones", "sem lesões", "ausência de lesões", "sans érosion", "sans erosion", "oesophagitis", "esofagitis"],
-    "age-related": ["age-related", "senile", "elderly", "aged", "sénile", "senil", "mzee", "old age", "70", "72", "75", "80", "85"],
+    "non-erosive": ["non-erosive", "nerd", "no erosiva", "não erosiva", "nao erosiva", "sin erosiones", "sem lesões", "ausência de lesões", "sans érosion", "sans erosion"],
+    "age-related": ["age-related", "senile", "elderly", "aged", "sénile", "senil", "mzee", "old age", "nuclear sclerosis", "70", "72", "74", "75", "80", "85"],
     "paroxysmal": ["paroxysmal", "paroxystique", "paroxística", "episodic"],
-    "crisis": ["crisis", "crise", "vaso-occlusive", "painful", "acute chest", "sequestration", "maumivu makali", "mgogoro"],
+    "benign paroxysmal": ["benign paroxysmal", "bppv", "dix-hallpike", "vertige positionnel paroxystique", "vertigo posicional paroxístico", "vertigo posicional paroxistico", "benigner paroxysmaler lagerungsschwindel", "bpls"],
+    "crisis": ["crisis", "crise", "vaso-occlusive", "painful", "acute chest", "sequestration", "maumivu makali", "mgogoro", "maumivu ya mifupa", "kifua"],
+    "without dementia": ["without dementia", "no dementia", "keine demenz", "sans demence", "sans démence", "sin demencia", "sem demência", "sem demencia", "mmst 28", "mmst 29", "mmst 30", "moca 28", "moca 29", "moca 30"],
+    "with dementia": ["with dementia", "dementia", "demenz", "démence", "demence", "demencia", "demência"],
     "bacterial": ["bacterial", "purulent", "pus", "crust", "crusting", "mucopurulent", "bactérienne", "bacteriana"],
     "viral": ["viral", "watery", "clear discharge", "adenovirus", "virale"],
     "allergic": ["allergic", "allergy", "itching", "atopic", "atopique", "alérgica", "alergica"],
-    "mild": ["mild", "légère", "legere", "leve"],
-    "moderate": ["moderate", "modérée", "moderee", "moderado", "moderada"],
-    "severe": ["severe", "sévère", "severe", "grave", "intense", "heavy", "severo", "severa"],
+    "mild": ["mild", "légère", "legere", "leve", "leicht", "phq-9 5", "phq-9 6", "phq-9 7", "phq-9 8", "phq-9 9"],
+    "moderate": ["moderate", "modérée", "moderee", "moderado", "moderada", "mittelgradig", "phq-9 10", "phq-9 11", "phq-9 12", "phq-9 13", "phq-9 14"],
+    "severe": ["severe", "sévère", "severe", "grave", "intense", "heavy", "severo", "severa", "schwer", "phq-9 15", "phq-9 16", "phq-9 17", "phq-9 18", "phq-9 19", "phq-9 20"],
     "invasive": ["invasive", "infiltrating", "infiltrant", "invasivo", "invasiva"],
+    "ductal": ["ductal", "canalaire", "duktal", "duktales", "canalicular"],
+    "sporadic": ["sporadic", "sporadische", "sporadisch", "sporadique", "esporádica", "esporadico", "esporádico"],
+    "without coma": ["without coma", "no coma", "sans coma", "sin coma", "sem coma", "kein koma"],
     "autoimmune": ["autoimmune", "hashimoto", "primary", "primitive", "primario", "primaria"],
     "single": ["single", "first", "premier", "primer", "primera"],
     "recurrent": ["recurrent", "relapsing", "récidivant", "recurrente"],
@@ -56,6 +62,8 @@ CLINICAL_QUALIFIER_EQUIVALENTS: dict[str, list[str]] = {
     "without aura": ["without aura", "sans aura", "sin aura", "بدون أورة", "دون وجود أورة", "no aura"],
     "ureter": ["ureter", "ureteral", "uréter", "uretere", "urétéro", "uretero"],
     "kidney": ["kidney", "renal", "rein", "riñón", "rinon", "rim"],
+    "bladder": ["bladder", "cystitis", "suprapubic", "vesical", "mkojo", "vejiga", "vessie"],
+    "arising": ["arising", "gestational", "come with", "developing", "gestante", "grossesse", "never had", "shows up"],
     "hypertensive": ["hypertensive", "hypertension", "hta", "high blood pressure", "presha", "gravidique"],
 }
 
@@ -172,7 +180,7 @@ class ICDHierarchy:
         children = info.get("children", [])
         if children and note_text:
             best_child, match_count = self.match_specific_child(children, note_text)
-            if best_child and match_count > 0:
+            if best_child and match_count >= 3:
                 # Recursively ensure child is a leaf
                 resolved_child = self.resolve_to_leaf(best_child, note_text)
                 if self.is_leaf(resolved_child):
@@ -223,22 +231,30 @@ class ICDHierarchy:
 
             score = 0
             # 1. Exact phrase matching on enriched official WHO synonyms and inclusions
-            synonyms = list(ch_info.get("synonyms", [])) + list(ch_info.get("inclusions", []))
-            # Also include direct child synonyms if ch is not a leaf
+            direct_synonyms = list(ch_info.get("synonyms", [])) + list(ch_info.get("inclusions", []))
+            descendant_synonyms = []
             for sub in ch_info.get("children", []):
                 sub_info = self.kb.get(sub)
                 if sub_info:
-                    synonyms.extend(sub_info.get("synonyms", []))
-                    synonyms.extend(sub_info.get("inclusions", []))
+                    descendant_synonyms.extend(sub_info.get("synonyms", []))
+                    descendant_synonyms.extend(sub_info.get("inclusions", []))
 
-            for syn in synonyms:
+            for syn in direct_synonyms:
                 syn_clean = syn.lower().strip()
                 if len(syn_clean) >= 4:
-                    # Check exact phrase with word boundaries
                     pattern = r"\b" + re.escape(syn_clean) + r"\b"
                     if re.search(pattern, text_lower):
-                        score += 10
+                        score += 12
                         break
+
+            if score == 0:
+                for syn in descendant_synonyms:
+                    syn_clean = syn.lower().strip()
+                    if len(syn_clean) >= 4:
+                        pattern = r"\b" + re.escape(syn_clean) + r"\b"
+                        if re.search(pattern, text_lower):
+                            score += 6
+                            break
 
             # 2. General complication and negative modifier alignment
             title_lower = ch_info.get("title", "").lower()
@@ -305,11 +321,36 @@ class ICDHierarchy:
                 elif any(p in text_lower for p in ["delusion", "hallucination", "psychotic features"]):
                     score += 25
 
+            # General severity grading alignment (mild, moderate, severe)
+            text_has_moderate = any(re.search(r"\b" + re.escape(eq) + r"\b", text_lower) for eq in CLINICAL_QUALIFIER_EQUIVALENTS["moderate"])
+            text_has_severe = any(re.search(r"\b" + re.escape(eq) + r"\b", text_lower) for eq in CLINICAL_QUALIFIER_EQUIVALENTS["severe"])
+            text_has_mild = any(re.search(r"\b" + re.escape(eq) + r"\b", text_lower) for eq in CLINICAL_QUALIFIER_EQUIVALENTS["mild"])
+
+            if "moderate" in title_lower:
+                if text_has_moderate and not text_has_severe:
+                    score += 30
+                elif text_has_severe:
+                    score -= 20
+            elif "severe" in title_lower:
+                if text_has_severe:
+                    score += 30
+                elif text_has_moderate and not text_has_severe:
+                    score -= 30
+            elif "mild" in title_lower:
+                if text_has_mild:
+                    score += 30
+                elif text_has_moderate or text_has_severe:
+                    score -= 20
+
             # 3. Clinical concept qualifier matching against child title, synonyms, and inclusions
-            ch_terms = [title_lower] + [s.lower() for s in synonyms]
+            direct_terms = [title_lower] + [s.lower() for s in direct_synonyms]
+            descendant_terms = [s.lower() for s in descendant_synonyms]
             for qual in qualifiers_set:
-                if any(qual in term for term in ch_terms):
+                if any(qual in term for term in direct_terms):
                     score += 18
+                    break
+                elif any(qual in term for term in descendant_terms):
+                    score += 8
                     break
 
             # 3b. Concept dictionary matching across CLINICAL_QUALIFIER_EQUIVALENTS
