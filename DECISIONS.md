@@ -649,6 +649,21 @@
   - $0.75 \times \text{Core Slice} (83.89) + 0.25 \times \text{Generalisation Slice} (61.03) = 62.92 + 15.26 = \mathbf{78.18 / 100}$ (exceeds the 75/100 threshold).
 - Hardcoded Code Rules: 0 (verified with zero `code == ...` checks)
 
+---
+
+## Entry 29 — 2026-11-09 10:38 IST — Calibrated Project Hours and Comprehensive Architectural Documentation
+
+**Commit:** `c892d45`  
+**Task:** Measure active prompt runtime across transcript history, record project hours according to the user review formula, and commit comprehensive project deep-dive documentation.  
+**Decision:**
+1. **Calibrated Project Hours:**
+   - Evaluated exact prompt execution duration from conversation logs (`transcript.jsonl`): 35,695 seconds (~9.92 hours, ~10 hours) across the 22 substantive engineering prompts.
+   - Added interactive prompt inspection, test suite review, and architectural audit time at 1 hour per prompt (22 hours).
+   - Recorded total time in `README.md` as **32 hours** (`Hours spent: 32 (10 hours prompt execution across 22 prompts + 22 hours review and verification)`).
+2. **Comprehensive Engineering Deep Dive:**
+   - Formatted and tracked `docs/PROJECT_DEEP_DIVE.md` detailing the entire problem formulation, 28-milestone chronological history, technical trade-off matrix, final pipeline architecture, verified benchmark metrics, and clinical intuitions.
+
+
 
 
 
