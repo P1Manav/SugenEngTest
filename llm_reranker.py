@@ -15,6 +15,12 @@ from typing import Any, Optional
 _openai_client = None
 _anthropic_client = None
 _httpx_client = None
+_gemini_disabled_until = 0.0
+_gemini_429_count = 0
+_openai_disabled_until = 0.0
+_openai_429_count = 0
+_anthropic_disabled_until = 0.0
+_anthropic_429_count = 0
 
 
 SYSTEM_PROMPT = """You are an expert WHO ICD-11 medical coder for outpatient clinics. Your job is to read a clinical note and select the most accurate ICD-11 diagnostic codes from the candidate list provided.
@@ -95,7 +101,7 @@ def _parse_llm_response(response_text: str, valid_candidates: set[str]) -> list[
 
     if text.startswith("```"):
         lines = text.split("\n")
-        lines = [l for l in lines if not l.strip().startswith("```")]
+        lines = [line for line in lines if not line.strip().startswith("```")]
         text = "\n".join(lines).strip()
 
     try:
@@ -129,47 +135,81 @@ def _parse_llm_response(response_text: str, valid_candidates: set[str]) -> list[
     return result
 
 
-async def _call_gemini(
+def _sync_call_gemini(
     note_text: str,
     candidate_block: str,
     valid_candidates: set[str],
     api_key: str,
-    model: str = "gemini-2.5-flash",
-    timeout: float = 25.0,
+    model: str = "gemini-3.5-flash",
+    timeout: float = 8.0,
 ) -> Optional[list[str]]:
-    """Call Google Gemini API via REST."""
-    global _httpx_client
-    if _httpx_client is None:
-        import httpx
-        _httpx_client = httpx.AsyncClient(timeout=timeout)
+    """Synchronous worker calling Gemini via urllib with circuit breaker and model fallback."""
+    global _gemini_disabled_until
+    if time.time() < _gemini_disabled_until:
+        return None
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+    import urllib.request
+    import urllib.error
+
+    models_to_try = [model, "gemini-3.6-flash"]
     prompt_text = f"{SYSTEM_PROMPT}\n\n{_build_user_prompt(note_text, candidate_block)}"
-    payload = {
+    payload = json.dumps({
         "contents": [{"parts": [{"text": prompt_text}]}],
         "generationConfig": {
             "response_mime_type": "application/json",
             "temperature": 0.0,
             "maxOutputTokens": 300,
         },
-    }
+    }).encode("utf-8")
 
-    try:
-        resp = await _httpx_client.post(url, json=payload, headers={"Content-Type": "application/json"})
-        if resp.status_code == 200:
-            data = resp.json()
-            candidates_out = data.get("candidates", [])
-            if candidates_out:
-                parts = candidates_out[0].get("content", {}).get("parts", [])
-                if parts:
-                    return _parse_llm_response(parts[0].get("text", ""), valid_candidates)
-        else:
-            sys.stderr.write(f"[WARN] Gemini API returned {resp.status_code}: {resp.text[:120]}\n")
-            return None
-    except Exception as e:
-        sys.stderr.write(f"[WARN] Gemini API request exception: {e}\n")
-        return None
+    for m in models_to_try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent?key={api_key}"
+        req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"})
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                if resp.status == 200:
+                    _gemini_429_count = 0
+                    data = json.loads(resp.read().decode("utf-8"))
+                    candidates_out = data.get("candidates", [])
+                    if candidates_out:
+                        parts = candidates_out[0].get("content", {}).get("parts", [])
+                        if parts:
+                            parsed = _parse_llm_response(parts[0].get("text", ""), valid_candidates)
+                            if parsed:
+                                return parsed
+        except urllib.error.HTTPError as e:
+            body = e.read().decode("utf-8", errors="ignore")[:100]
+            if e.code == 429:
+                _gemini_429_count += 1
+                backoff = 60.0 if _gemini_429_count == 1 else 300.0
+                _gemini_disabled_until = time.time() + backoff
+                sys.stderr.write(f"[WARN] Gemini 429 quota/rate limit (count={_gemini_429_count}): circuit open for {int(backoff)}s\n")
+                return None
+            sys.stderr.write(f"[WARN] Gemini ({m}) HTTP {e.code}: {body}\n")
+        except Exception as e:
+            sys.stderr.write(f"[WARN] Gemini ({m}) error: {e}\n")
+
     return None
+
+
+async def _call_gemini(
+    note_text: str,
+    candidate_block: str,
+    valid_candidates: set[str],
+    api_key: str,
+    model: str = "gemini-3.5-flash",
+    timeout: float = 15.0,
+) -> Optional[list[str]]:
+    """Call Google Gemini API asynchronously in thread pool with automatic model fallback."""
+    return await asyncio.to_thread(
+        _sync_call_gemini,
+        note_text,
+        candidate_block,
+        valid_candidates,
+        api_key,
+        model,
+        timeout,
+    )
 
 
 async def _call_openai(
@@ -177,17 +217,20 @@ async def _call_openai(
     candidate_block: str,
     valid_candidates: set[str],
     model: str = "gpt-4o-mini",
-    timeout: float = 30.0,
+    timeout: float = 20.0,
 ) -> Optional[list[str]]:
     """Call OpenAI API for code selection."""
-    global _openai_client
+    global _openai_client, _openai_disabled_until
+    if time.time() < _openai_disabled_until:
+        return None
+
     if _openai_client is None:
         try:
             from openai import AsyncOpenAI
             _openai_client = AsyncOpenAI(
                 api_key=os.environ.get("OPENAI_API_KEY"),
                 timeout=timeout,
-                max_retries=2,
+                max_retries=1,
             )
         except Exception as e:
             sys.stderr.write(f"[WARN] Failed to initialize OpenAI client: {e}\n")
@@ -207,7 +250,12 @@ async def _call_openai(
         text = response.choices[0].message.content or ""
         return _parse_llm_response(text, valid_candidates)
     except Exception as e:
-        sys.stderr.write(f"[WARN] OpenAI API error: {e}\n")
+        err_str = str(e).lower()
+        if "rate_limit" in err_str or "quota" in err_str or "429" in err_str:
+            _openai_disabled_until = time.time() + 30.0
+            sys.stderr.write("[WARN] OpenAI rate limit/quota: circuit open for 30s\n")
+        else:
+            sys.stderr.write(f"[WARN] OpenAI API error: {e}\n")
         return None
 
 
@@ -216,17 +264,20 @@ async def _call_anthropic(
     candidate_block: str,
     valid_candidates: set[str],
     model: str = "claude-3-5-haiku-20241022",
-    timeout: float = 30.0,
+    timeout: float = 20.0,
 ) -> Optional[list[str]]:
     """Call Anthropic API for code selection."""
-    global _anthropic_client
+    global _anthropic_client, _anthropic_disabled_until
+    if time.time() < _anthropic_disabled_until:
+        return None
+
     if _anthropic_client is None:
         try:
             from anthropic import AsyncAnthropic
             _anthropic_client = AsyncAnthropic(
                 api_key=os.environ.get("ANTHROPIC_API_KEY"),
                 timeout=timeout,
-                max_retries=2,
+                max_retries=1,
             )
         except Exception as e:
             sys.stderr.write(f"[WARN] Failed to initialize Anthropic client: {e}\n")
@@ -245,7 +296,12 @@ async def _call_anthropic(
         text = response.content[0].text if response.content else ""
         return _parse_llm_response(text, valid_candidates)
     except Exception as e:
-        sys.stderr.write(f"[WARN] Anthropic API error: {e}\n")
+        err_str = str(e).lower()
+        if "rate_limit" in err_str or "quota" in err_str or "429" in err_str:
+            _anthropic_disabled_until = time.time() + 30.0
+            sys.stderr.write("[WARN] Anthropic rate limit/quota: circuit open for 30s\n")
+        else:
+            sys.stderr.write(f"[WARN] Anthropic API error: {e}\n")
         return None
 
 
@@ -266,7 +322,7 @@ def _get_gemini_key() -> Optional[str]:
                         continue
                     if line.startswith("GEMINI_API_KEY=") or line.startswith("GOOGLE_API_KEY="):
                         return line.split("=", 1)[1].strip()
-                    elif not "=" in line and len(line) > 20:
+                    elif "=" not in line and len(line) > 20:
                         # Raw key line
                         return line
         except Exception:
@@ -304,7 +360,7 @@ class LLMReranker:
         if self.has_anthropic:
             active.append("Anthropic (claude-3-5-haiku)")
         if self.has_gemini:
-            active.append("Google Gemini (gemini-2.5-flash)")
+            active.append("Google Gemini (gemini-3.5-flash)")
 
         if active:
             sys.stderr.write(f"[INFO] LLM Reranker active providers: {', '.join(active)}\n")
@@ -349,22 +405,35 @@ class LLMReranker:
         candidate_block = _build_candidate_block(candidates)
 
         async with self.semaphore:
-            # 1. Try OpenAI if available (Standard on Sugen grading box)
-            if self.has_openai:
-                res = await _call_openai(note_text, candidate_block, valid_set)
-                if res:
-                    return res
+            # Determine provider order based on preference and available keys
+            providers = []
+            if self.prefer_provider == "gemini":
+                if self.has_gemini:
+                    providers.append("gemini")
+                if self.has_openai:
+                    providers.append("openai")
+                if self.has_anthropic:
+                    providers.append("anthropic")
+            else:
+                if self.has_openai:
+                    providers.append("openai")
+                if self.has_anthropic:
+                    providers.append("anthropic")
+                if self.has_gemini:
+                    providers.append("gemini")
 
-            # 2. Try Anthropic if available (Alternative on Sugen grading box)
-            if self.has_anthropic:
-                res = await _call_anthropic(note_text, candidate_block, valid_set)
-                if res:
-                    return res
-
-            # 3. Try Gemini if available
-            if self.has_gemini and self.gemini_key:
-                res = await _call_gemini(note_text, candidate_block, valid_set, self.gemini_key)
-                if res:
-                    return res
+            for p in providers:
+                if p == "openai":
+                    res = await _call_openai(note_text, candidate_block, valid_set)
+                    if res:
+                        return res
+                elif p == "anthropic":
+                    res = await _call_anthropic(note_text, candidate_block, valid_set)
+                    if res:
+                        return res
+                elif p == "gemini" and self.gemini_key:
+                    res = await _call_gemini(note_text, candidate_block, valid_set, self.gemini_key)
+                    if res:
+                        return res
 
         return None

@@ -101,7 +101,7 @@ def main():
                 seen_input_ids.add(note_id)
                 if note_id not in processed_ids:
                     pending_notes.append(item)
-            except Exception as e:
+            except Exception:
                 orig_id = extract_id_from_raw_line(line, line_idx)
                 if orig_id not in processed_ids and orig_id not in seen_input_ids:
                     seen_input_ids.add(orig_id)
@@ -130,7 +130,7 @@ def main():
     has_api = pipeline.llm_reranker.api_available
 
     if has_api:
-        print(f"API keys detected — running in HYBRID mode (LLM + offline fallback)")
+        print("API keys detected — running in HYBRID mode (LLM + offline fallback)")
         print(f"Processing {total_pending} notes with async LLM reranking...")
 
         # Run async event loop
@@ -138,7 +138,7 @@ def main():
             process_notes_hybrid(pipeline, pending_notes, output_path, processed_ids)
         )
     else:
-        print(f"No API keys — running in OFFLINE-ONLY mode (improved v1 with bug fixes)")
+        print("No API keys — running in OFFLINE-ONLY mode (improved v1 with bug fixes)")
         print(f"Processing {total_pending} notes sequentially...")
 
         completed = process_notes_offline(pipeline, pending_notes, output_path, processed_ids)

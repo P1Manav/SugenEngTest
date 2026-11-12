@@ -7,6 +7,7 @@ Designed to score 90+/100 on the Sugen hidden evaluation set.
 
 import asyncio
 import json
+import os
 import sys
 import time
 import traceback
@@ -73,12 +74,17 @@ class ICD11PipelineV2:
         # Offline fallback reranker (improved from v1)
         self.rule_reranker = RuleReranker(self.kb)
 
-        # LLM reranker
+        # LLM reranker with auto-detected default provider
+        default_pref = os.environ.get(
+            "PREFER_PROVIDER",
+            "openai" if os.environ.get("OPENAI_API_KEY")
+            else ("anthropic" if os.environ.get("ANTHROPIC_API_KEY") else "gemini")
+        )
         self.llm_reranker = LLMReranker(
             kb=self.kb,
             valid_codes=self.valid_codes,
             max_concurrency=20,
-            prefer_provider="openai",
+            prefer_provider=default_pref,
         )
 
         # Self test
