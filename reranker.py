@@ -460,7 +460,7 @@ class RuleReranker:
                 t_code = item.get("target_code")
                 if t_code in cand_code_set and t_code != code:
                     t_score = cand_score_map.get(t_code, 0.0)
-                    if t_score >= 0.5:
+                    if t_score >= 0.15 or t_score >= score:
                         # Competing condition with substantial evidence excludes this code
                         adj_score -= 0.12
                         break

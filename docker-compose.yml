@@ -7,4 +7,9 @@ services:
     volumes:
       - ./in:/in:ro
       - ./out:/out:rw
+    environment:
+      - OPENAI_API_KEY
+      - ANTHROPIC_API_KEY
+      - HTTPS_PROXY
+      - HTTP_PROXY
     entrypoint: ["python", "entrypoint.py"]

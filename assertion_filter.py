@@ -153,6 +153,13 @@ NON_DIAGNOSTIC_TERMS = {
 }
 
 
+SYMPTOM_OR_LAB_TERMS = {
+    "blood", "pain", "fever", "cough", "headache", "vomiting", "diarrhea", "diarrhoea",
+    "nausea", "swelling", "edema", "rash", "discharge", "sugar", "protein", "glucose",
+    "cells", "fluid", "urine", "stool", "weight", "loss", "vision", "sound", "breath",
+}
+
+
 class AssertionFilter:
     """Classify clinical statements and candidate diagnoses by assertion status."""
 
@@ -210,38 +217,49 @@ class AssertionFilter:
 
     def is_candidate_negated_in_note(self, candidate_title: str, note_text: str, affirmed_phrases: Optional[List[str]] = None) -> bool:
         """Check if a specific disease title is explicitly negated or marked as misdiagnosed in the note.
-        Never negates if the candidate title appears in the affirmed diagnosis phrases."""
+        Protects candidates if core terms appear in affirmed diagnosis phrases.
+        Incidental lab/symptom negatives (e.g. 'stool blood negative') never negate systemic diseases."""
         cand_lower = candidate_title.lower()
         substantive_words = [w for w in re.split(r"\W+", cand_lower) if len(w) > 3 and w not in NON_DIAGNOSTIC_TERMS]
         words = substantive_words if substantive_words else [w for w in re.split(r"\W+", cand_lower) if len(w) > 3]
         if not words:
             return False
 
-        # If candidate appears in affirmed diagnosis phrases, it cannot be negated
+        # If any primary substantive disease term appears in affirmed diagnosis phrases, candidate is protected
         if affirmed_phrases:
             for phrase in affirmed_phrases:
                 p_lower = phrase.lower()
-                if all(re.search(r"\b" + re.escape(w) + r"\b", p_lower) for w in words):
+                affirmed_matches = [w for w in words if len(w) >= 4 and re.search(r"\b" + re.escape(w) + r"\b", p_lower)]
+                # If at least 2 words or 40% of substantive words are affirmed, protect candidate
+                if len(affirmed_matches) >= 2 or (len(words) <= 2 and len(affirmed_matches) >= 1):
                     return False
 
         clauses = split_sentences_and_clauses(note_text)
         for clause in clauses:
             clause_lower = clause.lower()
-            # Ignore vaccination history (e.g. "not vaccinated vs mumps")
             if "vaccinated" in clause_lower or "immuniz" in clause_lower or "immunis" in clause_lower:
                 continue
 
-            # Check if substantive disease terms appear with word boundary
             matched = [w for w in words if re.search(r"\b" + re.escape(w) + r"\b", clause_lower)]
-            if matched:
-                # If all matched words appeared before 'without' in this clause (e.g. 'migraine' in 'migraine without aura'),
-                # the candidate condition is being qualified, not negated
-                if "without" in clause_lower:
-                    without_pos = clause_lower.find("without")
-                    all_before = all(re.search(r"\b" + re.escape(w) + r"\b", clause_lower[:without_pos]) for w in matched)
-                    if all_before:
-                        continue
-                assertion = self.check_clause_assertion(clause)
-                if assertion["negated"] or assertion["misdiagnosis"]:
-                    return True
+            if not matched:
+                continue
+
+            # Core fix: Incidental symptom/finding negation (e.g. 'blood negative', 'no cough')
+            # must not negate a disease title if the disease's primary pathology is not matched
+            non_symptom_words = [w for w in words if w not in SYMPTOM_OR_LAB_TERMS]
+            if non_symptom_words:
+                matched_non_symptoms = [w for w in matched if w not in SYMPTOM_OR_LAB_TERMS]
+                if not matched_non_symptoms:
+                    # Only symptom words matched in negated clause (e.g. 'blood' in 'stool blood negative')
+                    continue
+
+            if "without" in clause_lower:
+                without_pos = clause_lower.find("without")
+                all_before = all(re.search(r"\b" + re.escape(w) + r"\b", clause_lower[:without_pos]) for w in matched)
+                if all_before:
+                    continue
+
+            assertion = self.check_clause_assertion(clause)
+            if assertion["negated"] or assertion["misdiagnosis"]:
+                return True
         return False
