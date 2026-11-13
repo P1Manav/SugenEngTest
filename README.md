@@ -78,4 +78,4 @@ python score.py --gold data/dev_notes.jsonl --pred out/predictions.jsonl --mms d
 
 ---
 
-Hours spent: 32 (10 hours prompt execution across 22 prompts + 22 hours review and verification)
+Hours spent: 45 (12 hours prompt execution across 34 prompts + 33 hours review and verification)
