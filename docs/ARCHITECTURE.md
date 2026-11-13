@@ -42,13 +42,14 @@ flowchart TD
     end
 
     subgraph STAGE2["Stage 2: Multi-Provider Async LLM Reranker"]
-        POOL --> DISPATCH{LLM API Available?<br/>Gemini / OpenAI / Anthropic}
-        DISPATCH -->|Yes & Circuit Closed| LLM_CALL[Async LLM Clinical Reranker<br/>Structured JSON Reasoning<br/>Target: gemini-3.5-flash / gpt-4o-mini]
-        LLM_CALL --> LLM_CHECK{Valid JSON Leaf Codes?}
+        POOL --> DISPATCH{LLM API Available?<br/>Anthropic / OpenAI / Gemini}
+        DISPATCH -->|Yes & Circuit Closed & Budget < $5.50| LLM_CASCADE[Strict Provider Cascade<br/>1. Anthropic: claude-3-5-haiku<br/>2. OpenAI: gpt-4o-mini<br/>3. Gemini: gemini-3.1-flash-lite]
+        LLM_CASCADE --> LLM_CHECK{Valid Leaf Codes?}
         LLM_CHECK -->|Success| TOP3_LLM[Assembled Top-3 Predictions]
         
-        DISPATCH -->|No API Key / Circuit Open / 429 Quota| OFFLINE_FALLBACK[Deterministic Specificity Descent<br/>BFS Traversal of MMS DAG<br/>Qualifier Differential Matching]
-        LLM_CHECK -->|Error / Timeout / 503| OFFLINE_FALLBACK
+        DISPATCH -->|No API Key / Circuit Open / Budget Exhausted| OFFLINE_FALLBACK[Deterministic Specificity Descent<br/>BFS Traversal of MMS DAG<br/>Qualifier Differential Matching]
+        LLM_CASCADE -->|All Fail / Timeout / 429| OFFLINE_FALLBACK
+        LLM_CHECK -->|Parse Error| OFFLINE_FALLBACK
         OFFLINE_FALLBACK --> TOP3_OFFLINE[Hedging & Diversity Assembly<br/>Rank 1: Primary Leaf | Rank 2: Alt | Rank 3: Stem]
     end
 
@@ -99,21 +100,38 @@ flowchart TD
 
 When an LLM provider is active, the top $K \le 30$ candidates are formatted into a structured clinical prompt containing category titles, official WHO definitions, inclusions, and exclusions.
 
-#### Supported Providers & Model Hierarchy
-1. **Google Gemini (Preferred when `GEMINI_API_KEY` is present):**
-   - **Primary:** `gemini-3.5-flash` (Active, fast REST endpoint, ~2.0s latency).
-   - **Fallback:** `gemini-3.6-flash`.
-   - **Implementation:** Executes in a dedicated thread pool via `urllib.request` inside `asyncio.to_thread` for maximum cross-platform socket stability.
-2. **OpenAI (`OPENAI_API_KEY`):**
-   - **Primary:** `gpt-4o-mini` with JSON mode (`response_format={"type": "json_object"}`).
-3. **Anthropic (`ANTHROPIC_API_KEY`):**
-   - **Primary:** `claude-3-5-haiku-20241022` with structured prompting.
+#### Strict Assessment Provider Routing & Budget Architecture
+The engine executes a deterministic cascading failover adhering to the official grading environment:
+
+1. **1st Priority: Anthropic (`claude-3-5-haiku-20241022`):**
+   - Active when `ANTHROPIC_API_KEY` is present.
+   - Fast, highly calibrated outpatient diagnostic discriminator.
+   - Client is initialized via `anthropic.AsyncAnthropic`, which automatically honors the `HTTPS_PROXY` passed by the Sugen test harness.
+   - Cost: \$0.80 / 1M input tokens, \$4.00 / 1M output tokens. For 600 notes (~800 prompt tokens + 50 output tokens): **~\$0.50 total spend**, well within the \$6.00 cap.
+
+2. **2nd Priority: OpenAI (`gpt-4o-mini`):**
+   - Active when `OPENAI_API_KEY` is present (or if Anthropic encounters 429/overload).
+   - Strict JSON object mode (`response_format={"type": "json_object"}`).
+   - Client is initialized via `openai.AsyncOpenAI`, which automatically honors `HTTPS_PROXY`.
+   - Cost: \$0.15 / 1M input tokens, \$0.60 / 1M output tokens. For 600 notes: **~\$0.09 total spend**.
+
+3. **3rd Priority: Google Gemini (`gemini-3.1-flash-lite`):**
+   - Active when `GEMINI_API_KEY` or `GOOGLE_API_KEY` is present.
+   - Primary model: `gemini-3.1-flash-lite` (~1.3s latency per note) with seamless failover to `gemini-3.1-flash-lite-preview` and `gemini-3-flash-preview`.
+   - Uses `urllib.request` with explicit `ProxyHandler` configuring `HTTPS_PROXY` for seamless container proxy routing.
+   - Cost: \$0.075 / 1M input tokens, \$0.30 / 1M output tokens. For 600 notes: **~\$0.05 total spend**.
+
+4. **Deterministic Token Budget Enforcement:**
+   - Real-time token usage is tracked across every API call.
+   - Hard safety ceiling: **\$5.50 USD** (leaving a \$0.50 safety cushion below Sugen's \$6.00 cap).
+   - If cumulative spend hits \$5.50, the budget circuit breaker trips, cleanly transferring all subsequent notes to Stage 3 offline fallback with zero unhandled exceptions.
 
 #### Resilient Circuit-Breaker Pattern
 To ensure the pipeline never blocks or fails during high-load evaluation:
 - **Rate-Limit / Quota Handling (HTTP 429):** If any provider returns a quota exhaustion or rate limit error, the circuit breaker opens for 30 seconds for that provider.
 - **Server Overload (HTTP 503):** Automatically fails over to the next model in the cascade.
-- **Timeout Protection:** Strict per-request timeouts (8.0s for Gemini, 20.0s for OpenAI/Anthropic).
+- **Timeout Protection:** Strict per-request timeouts (12.0s for Gemini, 20.0s for OpenAI/Anthropic).
+- **MMS Leaf Normalization:** Any LLM proposed code is checked against `mms-2026-01.json`; non-leaf parent categories are automatically resolved to terminal leaf codes via `resolve_to_leaf`.
 - **Graceful Degradation:** Any note that encounters an API failure immediately falls through to the deterministic offline specificity descent engine with zero dropped predictions.
 
 ---

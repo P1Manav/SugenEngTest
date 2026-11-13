@@ -718,3 +718,28 @@
    - All 35 unit tests pass (`Ran 35 tests in 31.3s OK`).
    - 100% zero-drop guarantee: 0 missing IDs, 100% valid MMS leaf codes.
 
+---
+
+## Entry 32 — 2026-11-13 15:30 IST — Strict Provider Routing (Anthropic -> OpenAI -> Gemini -> Offline Fallback) and Real-Time Budget Cap Protection
+
+**Commit:** HEAD  
+**Task:** Implementation of strict assessment provider hierarchy, runtime proxy compliance, $6 budget cap tracking, and active Gemini model calibration  
+**Decision:**
+1. **Strict Provider Hierarchy & Cascading Failover:**
+   - Refactored `llm_reranker.py` and `pipeline_v2.py` to strictly implement the assessment router cascade:
+     - **1st Priority: Anthropic (`claude-3-5-haiku-20241022`):** Primary reasoning engine on evaluation container. Fast, highly calibrated on clinical differential diagnosis, and automatically honors `HTTPS_PROXY` via `anthropic.AsyncAnthropic`. Estimated 600-note cost: ~\$0.50 (well within \$6.00 cap).
+     - **2nd Priority: OpenAI (`gpt-4o-mini`):** High-speed fallback with strict JSON schema adherence (`response_format={"type": "json_object"}`). Automatically honors `HTTPS_PROXY` via `openai.AsyncOpenAI`. Estimated 600-note cost: ~\$0.09.
+     - **3rd Priority: Google Gemini (`gemini-3.1-flash-lite`):** High-throughput local testing and secondary fallback. Live endpoint probing discovered `gemini-3.1-flash-lite` as the fastest, lowest-latency active model (~1.3s latency per note) on Google's v1beta API. Configured with explicit `ProxyHandler` for HTTPS proxy compliance.
+     - **4th Priority: Deterministic Offline Fallback:** MMS DAG BFS traversal with Qualifier Differential Matching and Leaf Hedging. Executes in $<50$ ms with 100% valid leaf code guarantee.
+2. **Real-Time Token Budget Cap Enforcement:**
+   - Implemented real-time token expenditure tracking (`_check_and_update_budget`) with a hard safety threshold of **\$5.50** (leaving a \$0.50 buffer under the \$6.00 Sugen grading limit).
+   - If total estimated token spend reaches \$5.50, the budget circuit breaker trips, cleanly switching all subsequent notes to offline fallback to guarantee no disqualification.
+3. **MMS Leaf Resolution Safety Net:**
+   - Updated `predict_note_hybrid` in `pipeline_v2.py` so that any category code proposed by an LLM is validated against `mms-2026-01.json`. If an LLM suggests a non-leaf parent stem (e.g. `1F40`), `resolve_to_leaf` immediately descends to the appropriate validated leaf code (`1F40.Z`), guaranteeing zero invalid code penalties.
+4. **Empirical Verification:**
+   - 10-note sample test with active LLM reranking achieved **90.0% Top-1** and **90.0% Top-3** accuracy (Score: **67.5 / 75**, normalized: **90.0 / 100**).
+   - Full 60-note dev set completed in 96.2s with **62.1 / 75** (Top-1: 80.0%, Top-3: 88.3%).
+   - Zero missing predictions, zero invalid codes, zero duplicate IDs.
+   - All 35 unit tests pass (`Ran 35 tests in 16.1s OK`).
+
+

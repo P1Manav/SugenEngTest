@@ -74,16 +74,16 @@ class ICD11PipelineV2:
         # Offline fallback reranker (improved from v1)
         self.rule_reranker = RuleReranker(self.kb)
 
-        # LLM reranker with auto-detected default provider
+        # LLM reranker with strict router priority (Anthropic -> OpenAI -> Gemini -> Offline)
         default_pref = os.environ.get(
             "PREFER_PROVIDER",
-            "openai" if os.environ.get("OPENAI_API_KEY")
-            else ("anthropic" if os.environ.get("ANTHROPIC_API_KEY") else "gemini")
+            "anthropic" if os.environ.get("ANTHROPIC_API_KEY")
+            else ("openai" if os.environ.get("OPENAI_API_KEY") else "gemini")
         )
         self.llm_reranker = LLMReranker(
             kb=self.kb,
             valid_codes=self.valid_codes,
-            max_concurrency=20,
+            max_concurrency=10,
             prefer_provider=default_pref,
         )
 
@@ -243,14 +243,25 @@ class ICD11PipelineV2:
 
             if llm_codes and len(llm_codes) >= 1:
                 self.llm_success_count += 1
+                # Ensure all LLM codes are strictly valid leaf codes
+                resolved_llm_codes: list[str] = []
+                for code in llm_codes:
+                    if not self.hierarchy.is_leaf(code):
+                        leaf = self.hierarchy.resolve_to_leaf(code, raw_text)
+                        norm = normalize_code(leaf)
+                        if norm in self.valid_codes and norm not in resolved_llm_codes:
+                            resolved_llm_codes.append(norm)
+                    elif code in self.valid_codes and code not in resolved_llm_codes:
+                        resolved_llm_codes.append(code)
+
                 # Pad to 3 codes if LLM returned fewer
-                if len(llm_codes) < 3:
+                if len(resolved_llm_codes) < 3:
                     for code, _ in top_candidates:
-                        if code not in llm_codes:
-                            llm_codes.append(code)
-                        if len(llm_codes) >= 3:
+                        if code not in resolved_llm_codes and code in self.valid_codes and self.hierarchy.is_leaf(code):
+                            resolved_llm_codes.append(code)
+                        if len(resolved_llm_codes) >= 3:
                             break
-                return {"id": note_id, "codes": llm_codes[:3]}
+                return {"id": note_id, "codes": resolved_llm_codes[:3]}
             else:
                 # LLM failed, use offline fallback
                 self.llm_fail_count += 1
@@ -352,8 +363,8 @@ async def process_notes_hybrid(
     async def process_one(note: dict[str, Any]) -> dict[str, Any]:
         return await pipeline.predict_note_hybrid(note)
 
-    # Process in batches to avoid overwhelming the API
-    batch_size = 20
+    # Process in batches to pace API consumption smoothly
+    batch_size = 10
     with open(output_path, "a", encoding="utf-8") as out_f:
         for batch_start in range(0, total, batch_size):
             batch = notes[batch_start:batch_start + batch_size]
