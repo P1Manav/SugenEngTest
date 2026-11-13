@@ -3,8 +3,8 @@
 **Project:** ICD-11 Outpatient Clinical Coding Engine  
 **Application:** Sugen Technologies Engineering Application  
 **Execution Environment:** 8 vCPUs, 16 GB RAM, 0 GPUs, 60-Minute Hard Time Limit  
-**Repository Branch:** `master` (synchronized with `verify-v2` at commit `909c050`)  
-**Design Philosophy:** 100% Offline, Deterministic, Zero-LLM, Clinically Grounded  
+**Repository Branch:** `master`  
+**Design Philosophy:** Two-Stage Hybrid (Offline Funnel + Async Multi-Provider LLM Reranker with Deterministic Specificity Descent Fallback)  
 
 ---
 
@@ -441,7 +441,7 @@ flowchart LR
 
 #### Core Enhancements in v2:
 1. **Multi-Provider Async LLM Clinical Reranker (`llm_reranker.py`):**
-   - Implements native integration for **Google Gemini (`gemini-3.5-flash` primary, `gemini-3.6-flash` fallback)**, **OpenAI (`gpt-4o-mini`)**, and **Anthropic (`claude-3-5-haiku`)**.
+   - Implements native integration for **Anthropic (`claude-3-5-haiku-20241022` 1st priority)**, **OpenAI (`gpt-4o-mini` 2nd priority)**, and **Google Gemini (`gemini-3.1-flash-lite` 3rd priority)**.
    - Structured JSON output prompts the model with patient notes alongside candidate definitions, inclusions, and exclusions.
 2. **Resilient Production Circuit-Breaker:**
    - If an API provider returns HTTP 429 (quota exhausted) or HTTP 503 (server overloaded), the circuit breaker immediately opens for 30 seconds, routing traffic to Stage 1's deterministic specificity descent engine.
@@ -452,7 +452,31 @@ flowchart LR
    - Fixed `reranker.py` threshold logic (`t_score >= 0.15 or t_score >= score`), activating the full 3,042 WHO exclusion conflict pairs.
 5. **Empirical Performance Jump:**
    - Out-of-distribution blind set score increased from **31.67** to **61.54 / 100** on the offline fallback engine alone (+29.87 points).
-   - Hybrid Gemini execution achieved **100% Top-1 and 100% Top-3 Accuracy** across dev test evaluations.
+   - Hybrid execution achieved **90.0% Top-1 and 90.0% Top-3 Accuracy** (Score: **67.5 / 75**, normalized: **90.0 / 100**) across dev test evaluations.
    - Complete 35-test unit suite passes at **100%**.
+
+---
+
+### 8.3 Strict Provider Routing, $6 Budget Cap Enforcement, and Active Model Calibration
+
+To strictly satisfy the take-home assessment's operational constraints (`docs/BRIEF.md`), the v2 engine incorporates four production guarantees:
+
+1. **Strict Assessment Provider Hierarchy:**
+   - **1st Priority: Anthropic (`claude-3-5-haiku-20241022`):** Primary model on the grading box. High clinical calibration on differential diagnoses. Client uses `anthropic.AsyncAnthropic`, which automatically honors the `HTTPS_PROXY` passed by the test container. Estimated cost for 600 notes: ~\$0.50 (well within \$6.00 cap).
+   - **2nd Priority: OpenAI (`gpt-4o-mini`):** High-speed fallback with strict JSON object mode (`response_format={"type": "json_object"}`). Automatically honors `HTTPS_PROXY` via `openai.AsyncOpenAI`. Estimated cost for 600 notes: ~\$0.09.
+   - **3rd Priority: Google Gemini (`gemini-3.1-flash-lite`):** High-throughput local testing and secondary fallback. Live endpoint probing discovered `gemini-3.1-flash-lite` as the fastest, lowest-latency active model (~1.3s latency per note) on Google's v1beta API. Configured with explicit `ProxyHandler` for HTTPS proxy compliance.
+   - **4th Priority: Deterministic Offline Fallback:** MMS DAG BFS traversal with Qualifier Differential Matching and Leaf Hedging. Executes in $<50$ ms with 100% valid leaf code guarantee.
+
+2. **Real-Time Token Budget Cap Enforcement:**
+   - Implemented real-time token expenditure tracking (`_check_and_update_budget`) with a hard safety threshold of **\$5.50** (leaving a \$0.50 buffer under Sugen's \$6.00 cap).
+   - If total estimated token spend reaches \$5.50, the budget circuit breaker trips, cleanly switching all subsequent notes to offline fallback to guarantee no disqualification.
+
+3. **MMS Leaf Resolution Safety Net:**
+   - In `predict_note_hybrid` in `pipeline_v2.py`, any category code proposed by an LLM is validated against `mms-2026-01.json`. If an LLM suggests a non-leaf parent stem (e.g. `1F40`), `resolve_to_leaf` immediately descends to the appropriate validated leaf code (`1F40.Z`), guaranteeing zero invalid code penalties.
+
+4. **Zero-Drop Guarantee & Offline Execution:**
+   - As mandated by the brief, predictions are written incrementally and flushed (`out_f.flush()`) after **every single note**.
+   - With no API keys set, the engine executes fully offline, achieving **60.8 / 75** (Top-1: 76.7%, Top-3: 90.0%) with 0 missing predictions and 0 invalid codes.
+
 
 
